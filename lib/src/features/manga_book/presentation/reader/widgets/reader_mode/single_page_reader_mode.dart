@@ -30,6 +30,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
     required this.manga,
     required this.chapter,
     required this.chapterPages,
+    required this.initialOverlayVisible,
     this.onPageChanged,
     this.reverse = false,
     this.scrollDirection = Axis.horizontal,
@@ -42,6 +43,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
   final bool reverse;
   final Axis scrollDirection;
   final bool showReaderLayoutAnimation;
+  final bool initialOverlayVisible;
   final ChapterPagesDto chapterPages;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -108,6 +110,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
       manga: manga,
       chapterPages: chapterPages,
       currentIndex: currentIndex.value,
+      initialOverlayVisible: initialOverlayVisible,
       onChanged: (index) => scrollController.jumpToPage(index),
       showReaderLayoutAnimation: showReaderLayoutAnimation,
       onPrevious: () => scrollController.previousPage(

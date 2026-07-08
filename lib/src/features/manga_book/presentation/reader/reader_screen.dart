@@ -17,6 +17,7 @@ import '../../../history/presentation/history_controller.dart';
 import '../../../library/presentation/category/controller/edit_category_controller.dart';
 import '../../../library/presentation/library/controller/library_controller.dart';
 import '../../../settings/presentation/reader/widgets/reader_ignore_safe_area_tile/reader_ignore_safe_area_tile.dart';
+import '../../../settings/presentation/reader/widgets/reader_initial_overlay_tile/reader_initial_overlay_tile.dart';
 import '../../../settings/presentation/reader/widgets/reader_mode_tile/reader_mode_tile.dart';
 import '../../data/manga_book/manga_book_repository.dart';
 import '../../domain/chapter_batch/chapter_batch_model.dart';
@@ -31,10 +32,12 @@ class ReaderScreen extends HookConsumerWidget {
     super.key,
     required this.mangaId,
     required this.chapterId,
+    this.useInitialReaderOverlay = true,
     this.showReaderLayoutAnimation = false,
   });
   final int mangaId;
   final int chapterId;
+  final bool useInitialReaderOverlay;
   final bool showReaderLayoutAnimation;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,6 +48,9 @@ class ReaderScreen extends HookConsumerWidget {
     final chapter = ref.watch(chapterProviderWithIndex);
     final defaultReaderMode = ref.watch(readerModeKeyProvider);
     final ignoreSafeArea = ref.watch(readerIgnoreSafeAreaProvider).ifNull();
+    final initialOverlayVisible = useInitialReaderOverlay
+        ? ref.watch(readerInitialOverlayProvider).ifNull()
+        : false;
 
     final debounce = useRef<Timer?>(null);
     final lastSavedPage = useRef(
@@ -188,6 +194,7 @@ class ReaderScreen extends HookConsumerWidget {
                               chapter: chapterData,
                               manga: data,
                               onPageChanged: onPageChanged,
+                              initialOverlayVisible: initialOverlayVisible,
                               scrollDirection: Axis.vertical,
                               showReaderLayoutAnimation:
                                   showReaderLayoutAnimation,
@@ -198,6 +205,7 @@ class ReaderScreen extends HookConsumerWidget {
                               chapter: chapterData,
                               manga: data,
                               onPageChanged: onPageChanged,
+                              initialOverlayVisible: initialOverlayVisible,
                               reverse: true,
                               showReaderLayoutAnimation:
                                   showReaderLayoutAnimation,
@@ -208,6 +216,7 @@ class ReaderScreen extends HookConsumerWidget {
                               chapter: chapterData,
                               manga: data,
                               onPageChanged: onPageChanged,
+                              initialOverlayVisible: initialOverlayVisible,
                               scrollDirection: Axis.horizontal,
                               showReaderLayoutAnimation:
                                   showReaderLayoutAnimation,
@@ -218,6 +227,7 @@ class ReaderScreen extends HookConsumerWidget {
                               chapter: chapterData,
                               manga: data,
                               onPageChanged: onPageChanged,
+                              initialOverlayVisible: initialOverlayVisible,
                               scrollDirection: Axis.horizontal,
                               reverse: true,
                               showReaderLayoutAnimation:
@@ -229,12 +239,14 @@ class ReaderScreen extends HookConsumerWidget {
                               chapter: chapterData,
                               manga: data,
                               onPageChanged: onPageChanged,
+                              initialOverlayVisible: initialOverlayVisible,
                               chapterPages: chapterPagesData,
                             ),
                           ReaderMode.continuousVertical => ContinuousReaderMode(
                               chapter: chapterData,
                               manga: data,
                               onPageChanged: onPageChanged,
+                              initialOverlayVisible: initialOverlayVisible,
                               showSeparator: true,
                               showReaderLayoutAnimation:
                                   showReaderLayoutAnimation,
@@ -244,6 +256,7 @@ class ReaderScreen extends HookConsumerWidget {
                               chapter: chapterData,
                               manga: data,
                               onPageChanged: onPageChanged,
+                              initialOverlayVisible: initialOverlayVisible,
                               showReaderLayoutAnimation:
                                   showReaderLayoutAnimation,
                               chapterPages: chapterPagesData,
@@ -255,6 +268,7 @@ class ReaderScreen extends HookConsumerWidget {
                                   chapter: chapterData,
                                   manga: data,
                                   onPageChanged: onPageChanged,
+                                  initialOverlayVisible: initialOverlayVisible,
                                   chapterPages: chapterPagesData,
                                 ),
                               ReaderMode.singleHorizontalRTL =>
@@ -262,6 +276,7 @@ class ReaderScreen extends HookConsumerWidget {
                                   chapter: chapterData,
                                   manga: data,
                                   onPageChanged: onPageChanged,
+                                  initialOverlayVisible: initialOverlayVisible,
                                   reverse: true,
                                   showReaderLayoutAnimation:
                                       showReaderLayoutAnimation,
@@ -271,6 +286,7 @@ class ReaderScreen extends HookConsumerWidget {
                                   chapter: chapterData,
                                   manga: data,
                                   onPageChanged: onPageChanged,
+                                  initialOverlayVisible: initialOverlayVisible,
                                   scrollDirection: Axis.vertical,
                                   showReaderLayoutAnimation:
                                       showReaderLayoutAnimation,
@@ -281,6 +297,7 @@ class ReaderScreen extends HookConsumerWidget {
                                   chapter: chapterData,
                                   manga: data,
                                   onPageChanged: onPageChanged,
+                                  initialOverlayVisible: initialOverlayVisible,
                                   scrollDirection: Axis.horizontal,
                                   showReaderLayoutAnimation:
                                       showReaderLayoutAnimation,
@@ -291,6 +308,7 @@ class ReaderScreen extends HookConsumerWidget {
                                   chapter: chapterData,
                                   manga: data,
                                   onPageChanged: onPageChanged,
+                                  initialOverlayVisible: initialOverlayVisible,
                                   scrollDirection: Axis.horizontal,
                                   reverse: true,
                                   showReaderLayoutAnimation:
@@ -302,6 +320,7 @@ class ReaderScreen extends HookConsumerWidget {
                                   chapter: chapterData,
                                   manga: data,
                                   onPageChanged: onPageChanged,
+                                  initialOverlayVisible: initialOverlayVisible,
                                   showSeparator: true,
                                   showReaderLayoutAnimation:
                                       showReaderLayoutAnimation,
@@ -311,6 +330,7 @@ class ReaderScreen extends HookConsumerWidget {
                                   chapter: chapterData,
                                   manga: data,
                                   onPageChanged: onPageChanged,
+                                  initialOverlayVisible: initialOverlayVisible,
                                   showReaderLayoutAnimation:
                                       showReaderLayoutAnimation,
                                   chapterPages: chapterPagesData,

@@ -24,8 +24,6 @@ import '../../../../../utils/extensions/custom_extensions.dart';
 import '../../../../../utils/launch_url_in_web.dart';
 import '../../../../../utils/misc/toast/toast.dart';
 import '../../../../../widgets/popup_widgets/radio_list_popup.dart';
-import '../../../../settings/presentation/reader/widgets/reader_initial_overlay_tile/reader_initial_overlay_tile.dart';
-import '../../../../settings/presentation/reader/widgets/reader_invert_tap_tile/reader_invert_tap_tile.dart';
 import '../../../../settings/presentation/reader/widgets/reader_last_page_swipe_tile/reader_last_page_swipe_tile.dart';
 import '../../../../settings/presentation/reader/widgets/reader_magnifier_size_slider/reader_magnifier_size_slider.dart';
 import '../../../../settings/presentation/reader/widgets/reader_mode_tile/reader_mode_tile.dart';
@@ -54,6 +52,7 @@ class ReaderWrapper extends HookConsumerWidget {
     required this.chapter,
     required this.onChanged,
     required this.currentIndex,
+    required this.initialOverlayVisible,
     required this.onNext,
     required this.onPrevious,
     required this.scrollDirection,
@@ -68,6 +67,7 @@ class ReaderWrapper extends HookConsumerWidget {
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final int currentIndex;
+  final bool initialOverlayVisible;
   final Axis scrollDirection;
   final bool showReaderLayoutAnimation;
   final ChapterPagesDto chapterPages;
@@ -125,8 +125,6 @@ class ReaderWrapper extends HookConsumerWidget {
         chapterId: chapter.id,
       ),
     );
-    final invertTap = ref.watch(invertTapProvider).ifNull();
-
     final bool volumeTap = ref.watch(volumeTapProvider).ifNull();
     final bool volumeTapInvert = ref.watch(volumeTapInvertProvider).ifNull();
 
@@ -143,8 +141,7 @@ class ReaderWrapper extends HookConsumerWidget {
         ref.watch(readerMagnifierSizeKeyProvider) ??
             DBKeys.readerMagnifierSize.initial;
 
-    final visibility =
-        useState(ref.read(readerInitialOverlayProvider).ifNull());
+    final visibility = useState(initialOverlayVisible);
     final mangaReaderPadding =
         useState(manga.metaData.readerPadding ?? localMangaReaderPadding);
     final mangaReaderMagnifierSize = useState(
@@ -236,6 +233,7 @@ class ReaderWrapper extends HookConsumerWidget {
           chapterId: nextPrevChapterPair!.first!.id,
           transVertical: transVertical,
           toPrev: toPrev,
+          fromReaderChapterNavigation: true,
         ).pushReplacement(context);
       }
     }, [nextPrevChapterPair, manga.id, resolvedReaderMode]);
@@ -253,6 +251,7 @@ class ReaderWrapper extends HookConsumerWidget {
           chapterId: nextPrevChapterPair!.second!.id,
           toPrev: toPrev,
           transVertical: transVertical,
+          fromReaderChapterNavigation: true,
         ).pushReplacement(context);
       }
     }, [nextPrevChapterPair, manga.id, resolvedReaderMode]);
@@ -435,7 +434,7 @@ class ReaderWrapper extends HookConsumerWidget {
                             currentValue: currentIndex,
                             maxValue: actualPageCount,
                             onChanged: (index) => onChanged(index),
-                            inverted: invertTap,
+                            inverted: _isRTLReaderMode(resolvedReaderMode),
                           ),
                         ),
                         Card(

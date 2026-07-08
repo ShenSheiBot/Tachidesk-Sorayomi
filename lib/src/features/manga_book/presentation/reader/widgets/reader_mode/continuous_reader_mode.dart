@@ -43,6 +43,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
     required this.manga,
     required this.chapter,
     required this.chapterPages,
+    required this.initialOverlayVisible,
     this.showSeparator = false,
     this.onPageChanged,
     this.scrollDirection = Axis.vertical,
@@ -57,6 +58,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
   final Axis scrollDirection;
   final bool reverse;
   final bool showReaderLayoutAnimation;
+  final bool initialOverlayVisible;
   final ChapterPagesDto chapterPages;
 
   @override
@@ -158,6 +160,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
       manga: manga,
       showReaderLayoutAnimation: showReaderLayoutAnimation,
       currentIndex: currentIndex.value,
+      initialOverlayVisible: initialOverlayVisible,
       onChanged: (index) {
         // Mark that we're navigating from slider to prevent position interference
         isNavigatingFromSlider.value = true;
