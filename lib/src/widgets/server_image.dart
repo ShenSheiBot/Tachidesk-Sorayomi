@@ -46,7 +46,7 @@ class ServerImage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final key = useState(UniqueKey());
+    final reloadCount = useState(0);
     // Providers
     final authType = ref.watch(authTypeKeyProvider);
     final basicToken = ref.watch(credentialsProvider);
@@ -97,7 +97,7 @@ class ServerImage extends HookConsumerWidget {
                   const Gap(32),
                   TextButton(
                     onPressed: () {
-                      key.value = (UniqueKey());
+                      reloadCount.value++;
                     },
                     child: Text(context.l10n.reload),
                   ),
@@ -118,7 +118,7 @@ class ServerImage extends HookConsumerWidget {
     }
 
     return CachedNetworkImage(
-      key: key.value,
+      key: ValueKey('$baseApi-${reloadCount.value}'),
       imageUrl: baseApi,
       height: size?.height,
       cacheManager: DefaultCacheManager(),

@@ -107,8 +107,8 @@ AsyncValue<List<ChapterDto>?> mangaChapterListWithFilter(
   final chapterFilterDownloaded =
       ref.watch(mangaChapterFilterDownloadedProvider);
   final chapterFilterBookmark = ref.watch(mangaChapterFilterBookmarkedProvider);
-  final ChapterSort sortedBy = ref.watch(mangaChapterSortProvider) ??
-      DBKeys.chapterSortDirection.initial;
+  final ChapterSort sortedBy =
+      ref.watch(mangaChapterSortProvider) ?? DBKeys.chapterSort.initial;
   final sortedDirection =
       ref.watch(mangaChapterSortDirectionProvider).ifNull(true);
 
@@ -195,6 +195,9 @@ ChapterDto? firstUnreadInFilteredChapterList(
   } else {
     final current =
         filteredList.indexWhere((element) => element.id == chapterId);
+    if (current == -1) {
+      return null;
+    }
     final prevChapter = current > 0 ? filteredList[current - 1] : null;
     final nextChapter =
         current < (filteredList.length - 1) ? filteredList[current + 1] : null;

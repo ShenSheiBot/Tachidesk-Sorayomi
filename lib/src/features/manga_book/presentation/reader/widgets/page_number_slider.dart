@@ -25,21 +25,27 @@ class PageNumberSlider extends StatelessWidget {
   final bool inverted;
   @override
   Widget build(BuildContext context) {
+    final effectiveMaxValue = max(maxValue, 1);
+    final effectiveCurrentValue = min(
+      max(currentValue, 0),
+      effectiveMaxValue - 1,
+    );
+    final sliderEnabled = effectiveMaxValue > 1;
     final sliderWidget = [
-      Text("${currentValue + 1}"),
+      Text("${effectiveCurrentValue + 1}"),
       Expanded(
         child: Transform.flip(
           flipX: inverted,
           child: Slider(
-            value: min(currentValue.toDouble(), maxValue.toDouble()),
+            value: effectiveCurrentValue.toDouble(),
             min: 0,
-            max: maxValue.toDouble() - 1,
-            divisions: max(maxValue - 1, 1),
-            onChanged: (val) => onChanged(val.toInt()),
+            max: (effectiveMaxValue - 1).toDouble(),
+            divisions: max(effectiveMaxValue - 1, 1),
+            onChanged: sliderEnabled ? (val) => onChanged(val.toInt()) : null,
           ),
         ),
       ),
-      Text("$maxValue"),
+      Text("$effectiveMaxValue"),
     ];
     return Card(
       color: context.theme.appBarTheme.backgroundColor?.withValues(alpha: .7),

@@ -37,7 +37,7 @@ class ReaderRoute extends GoRouteData {
   @override
   Page<void> buildPage(context, state) {
     return CustomTransitionPage(
-      key: state.pageKey,
+      key: ValueKey('reader-$mangaId-$chapterId'),
       child: ReaderScreen(
         mangaId: mangaId,
         chapterId: chapterId,

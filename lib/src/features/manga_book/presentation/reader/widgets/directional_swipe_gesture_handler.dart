@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../../../../../constants/enum.dart';
-import '../../../../../routes/router_config.dart';
 import '../../../domain/chapter/chapter_model.dart';
 import '../../../domain/chapter_page/chapter_page_model.dart';
 import '../utils/last_page_swipe_utils.dart';
@@ -29,10 +28,11 @@ class DirectionalSwipeGestureHandler extends HookWidget {
     required this.resolvedReaderMode,
     required this.currentIndex,
     required this.chapterPages,
-    required this.mangaId,
     required this.prevNextChapterPair,
     required this.onNextPage,
     required this.onPreviousPage,
+    required this.onNextChapter,
+    required this.onPreviousChapter,
     required this.pageController,
   });
 
@@ -47,10 +47,11 @@ class DirectionalSwipeGestureHandler extends HookWidget {
   final ReaderMode resolvedReaderMode;
   final int currentIndex;
   final ChapterPagesDto chapterPages;
-  final int mangaId;
   final ({ChapterDto? first, ChapterDto? second})? prevNextChapterPair;
   final VoidCallback onNextPage;
   final VoidCallback onPreviousPage;
+  final VoidCallback onNextChapter;
+  final VoidCallback onPreviousChapter;
   final PageController? pageController;
 
   @override
@@ -235,11 +236,7 @@ class DirectionalSwipeGestureHandler extends HookWidget {
   void _navigateToNextChapterWithFallback(BuildContext context) {
     if (prevNextChapterPair?.first != null) {
       try {
-        ReaderRoute(
-          mangaId: mangaId,
-          chapterId: prevNextChapterPair!.first!.id,
-          transVertical: scrollDirection != Axis.vertical,
-        ).pushReplacement(context);
+        onNextChapter();
       } catch (e) {
         onNextPage();
       }
@@ -252,12 +249,7 @@ class DirectionalSwipeGestureHandler extends HookWidget {
   void _navigateToPreviousChapterWithFallback(BuildContext context) {
     if (prevNextChapterPair?.second != null) {
       try {
-        ReaderRoute(
-          mangaId: mangaId,
-          chapterId: prevNextChapterPair!.second!.id,
-          toPrev: true,
-          transVertical: scrollDirection != Axis.vertical,
-        ).pushReplacement(context);
+        onPreviousChapter();
       } catch (e) {
         onPreviousPage();
       }

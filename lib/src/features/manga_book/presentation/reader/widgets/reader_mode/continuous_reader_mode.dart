@@ -65,24 +65,33 @@ class ContinuousReaderMode extends HookConsumerWidget {
         useMemoized(() => ItemScrollController());
     final ItemPositionsListener positionsListener =
         useMemoized(() => ItemPositionsListener.create());
+    final actualPageCount = chapterPages.pages.length;
+    final lastPageIndex = actualPageCount == 0 ? 0 : actualPageCount - 1;
+    final initialPage = chapter.isRead.ifNull()
+        ? 0
+        : chapter.lastPageRead
+            .getValueOnNullOrNegative()
+            .clamp(0, lastPageIndex)
+            .toInt();
 
     final ValueNotifier<int> currentIndex = useState(
-      chapter.isRead.ifNull()
-          ? 0
-          : (chapter.lastPageRead).getValueOnNullOrNegative(),
+      initialPage,
     );
 
     // Passive position tracking that doesn't interfere with scrolling
     final ObjectRef<Timer?> positionUpdateTimer = useRef<Timer?>(null);
+    final ObjectRef<Timer?> sliderResetTimer = useRef<Timer?>(null);
     final ValueNotifier<bool> isUserScrolling = useState(false);
     final ValueNotifier<bool> isNavigatingFromSlider = useState(false);
-    final ValueNotifier<int> lastReportedIndex = useState(currentIndex.value);
+    final ValueNotifier<int> lastReportedIndex = useState(-1);
 
     // Dispose timer properly
     useEffect(() {
       return () {
         positionUpdateTimer.value?.cancel();
         positionUpdateTimer.value = null;
+        sliderResetTimer.value?.cancel();
+        sliderResetTimer.value = null;
       };
     }, []);
 
@@ -97,7 +106,11 @@ class ContinuousReaderMode extends HookConsumerWidget {
         // Don't update position if we're navigating from slider
         if (!isNavigatingFromSlider.value) {
           // Always update position for UI display (navigation bar needs this)
-          _updatePositionForDisplay(positions, currentIndex, lastReportedIndex);
+          _updatePositionForDisplay(
+            positions,
+            currentIndex,
+            lastPageIndex,
+          );
         }
 
         // Mark as user scrolling to prevent programmatic navigation
@@ -161,7 +174,8 @@ class ContinuousReaderMode extends HookConsumerWidget {
         );
 
         // Reset the flag after the navigation completes
-        Timer(const Duration(milliseconds: 300), () {
+        sliderResetTimer.value?.cancel();
+        sliderResetTimer.value = Timer(const Duration(milliseconds: 300), () {
           isNavigatingFromSlider.value = false;
         });
       },
@@ -171,6 +185,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
         positionsListener,
         isUserScrolling,
         isAnimationEnabled,
+        lastPageIndex,
         isNext: false,
       ),
       onNext: () => _handleNavigationSafely(
@@ -178,6 +193,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
         positionsListener,
         isUserScrolling,
         isAnimationEnabled,
+        lastPageIndex,
         isNext: true,
       ),
       child: AppUtils.wrapOn(
@@ -189,19 +205,26 @@ class ContinuousReaderMode extends HookConsumerWidget {
         ScrollablePositionedList.separated(
           itemScrollController: scrollController,
           itemPositionsListener: positionsListener,
-          initialScrollIndex: chapter.isRead.ifNull()
-              ? 0
-              : chapter.lastPageRead.getValueOnNullOrNegative(),
+          initialScrollIndex: initialPage,
           scrollDirection: scrollDirection,
           reverse: reverse,
-          itemCount: chapterPages.chapter.pageCount,
+          itemCount: actualPageCount == 0 ? 1 : actualPageCount,
           minCacheExtent: scrollDirection == Axis.vertical
               ? context.height * 2
               : context.width * 2,
           separatorBuilder: (BuildContext context, int index) =>
               showSeparator ? const Gap(16) : const SizedBox.shrink(),
           itemBuilder: (BuildContext context, int index) {
+            if (actualPageCount == 0 || index >= actualPageCount) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+
             final Widget image = ServerImage(
+              key: ValueKey(
+                'continuous-page-${chapter.id}-$index-${chapterPages.pages[index]}',
+              ),
               showReloadButton: true,
               fit: scrollDirection == Axis.vertical
                   ? BoxFit.fitWidth
@@ -224,7 +247,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
               ),
             );
 
-            if (index == 0 || index == chapterPages.chapter.pageCount - 1) {
+            if (index == 0 || index == actualPageCount - 1) {
               final bool reverseDirection =
                   scrollDirection == Axis.horizontal && reverse;
               final Widget separator = SizedBox(
@@ -258,9 +281,19 @@ class ContinuousReaderMode extends HookConsumerWidget {
   static void _updatePositionForDisplay(
     List<ItemPosition> positions,
     ValueNotifier<int> currentIndex,
-    ValueNotifier<int> lastReportedIndex,
+    int lastPageIndex,
   ) {
     if (positions.isEmpty) return;
+
+    for (final ItemPosition position in positions) {
+      if (position.index == lastPageIndex &&
+          position.itemLeadingEdge >= 0 &&
+          position.itemLeadingEdge <= 1 &&
+          position.itemTrailingEdge <= 1) {
+        currentIndex.value = lastPageIndex;
+        return;
+      }
+    }
 
     // Find the item that's most visible for display purposes
     ItemPosition? mostVisible;
@@ -316,6 +349,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
       ItemPositionsListener positionsListener,
       ValueNotifier<bool> isUserScrolling,
       bool isAnimationEnabled,
+      int lastPageIndex,
       {required bool isNext}) {
     // Don't interfere if user is actively scrolling
     if (isUserScrolling.value) return;
@@ -342,20 +376,21 @@ class ContinuousReaderMode extends HookConsumerWidget {
     if (isNext) {
       // Move to next item with minimal scroll
       if (currentPosition.itemTrailingEdge > 0.8) {
-        targetIndex = currentPosition.index + 1;
+        targetIndex =
+            (currentPosition.index + 1).clamp(0, lastPageIndex).toInt();
         alignment = 0.0;
       } else {
-        targetIndex = currentPosition.index;
+        targetIndex = currentPosition.index.clamp(0, lastPageIndex).toInt();
         alignment = 0.0;
       }
     } else {
       // Move to previous item with minimal scroll
       if (currentPosition.itemLeadingEdge < 0.2) {
         targetIndex =
-            (currentPosition.index - 1).clamp(0, double.infinity).toInt();
+            (currentPosition.index - 1).clamp(0, lastPageIndex).toInt();
         alignment = 0.0;
       } else {
-        targetIndex = currentPosition.index;
+        targetIndex = currentPosition.index.clamp(0, lastPageIndex).toInt();
         alignment = 0.0;
       }
     }

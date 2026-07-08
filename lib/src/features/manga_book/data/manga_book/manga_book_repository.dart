@@ -136,6 +136,7 @@ class MangaBookRepository {
       client
           .mutate$GetChapterPages(
             Options$Mutation$GetChapterPages(
+              fetchPolicy: FetchPolicy.noCache,
               variables: Variables$Mutation$GetChapterPages(
                   input: Input$FetchChapterPagesInput(chapterId: chapterId)),
             ),

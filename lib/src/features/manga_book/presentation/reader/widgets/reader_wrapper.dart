@@ -222,59 +222,6 @@ class ReaderWrapper extends HookConsumerWidget {
       return null;
     }, [visibility.value]);
 
-    // Enhanced navigation callbacks with last-page swipe logic
-    final enhancedOnNext = useCallback(() {
-      if (lastPageSwipeEnabled && !readerSwipeChapterToggle) {
-        // Check if we're at the last page
-        final isAtLastPage = currentIndex >= (chapterPages.pages.length - 1);
-
-        if (isAtLastPage && nextPrevChapterPair?.first != null) {
-          // Navigate to next chapter
-          ReaderRoute(
-            mangaId: manga.id,
-            chapterId: nextPrevChapterPair!.first!.id,
-            transVertical: scrollDirection != Axis.vertical,
-          ).pushReplacement(context);
-          return;
-        }
-      }
-
-      // Use normal page navigation
-      onNext();
-    }, [
-      lastPageSwipeEnabled,
-      readerSwipeChapterToggle,
-      currentIndex,
-      chapterPages.pages.length,
-      nextPrevChapterPair
-    ]);
-
-    final enhancedOnPrevious = useCallback(() {
-      if (lastPageSwipeEnabled && !readerSwipeChapterToggle) {
-        // Check if we're at the first page
-        final isAtFirstPage = currentIndex <= 0;
-
-        if (isAtFirstPage && nextPrevChapterPair?.second != null) {
-          // Navigate to previous chapter
-          ReaderRoute(
-            mangaId: manga.id,
-            chapterId: nextPrevChapterPair!.second!.id,
-            toPrev: true,
-            transVertical: scrollDirection != Axis.vertical,
-          ).pushReplacement(context);
-          return;
-        }
-      }
-
-      // Use normal page navigation
-      onPrevious();
-    }, [
-      lastPageSwipeEnabled,
-      readerSwipeChapterToggle,
-      currentIndex,
-      nextPrevChapterPair
-    ]);
-
     // Chapter navigation callbacks with direction-aware animations
     final onNextChapter = useCallback(() {
       if (nextPrevChapterPair?.first != null) {
@@ -309,6 +256,44 @@ class ReaderWrapper extends HookConsumerWidget {
         ).pushReplacement(context);
       }
     }, [nextPrevChapterPair, manga.id, resolvedReaderMode]);
+
+    final actualPageCount = chapterPages.pages.length;
+
+    // Explicit next/previous page actions should cross chapter boundaries.
+    // The last-page swipe setting only controls swipe gestures.
+    final enhancedOnNext = useCallback(() {
+      final isAtLastPage =
+          actualPageCount > 0 && currentIndex >= (actualPageCount - 1);
+
+      if (isAtLastPage && nextPrevChapterPair?.first != null) {
+        onNextChapter();
+        return;
+      }
+
+      onNext();
+    }, [
+      actualPageCount,
+      currentIndex,
+      nextPrevChapterPair,
+      onNextChapter,
+      onNext
+    ]);
+
+    final enhancedOnPrevious = useCallback(() {
+      final isAtFirstPage = currentIndex <= 0;
+
+      if (isAtFirstPage && nextPrevChapterPair?.second != null) {
+        onPreviousChapter();
+        return;
+      }
+
+      onPrevious();
+    }, [
+      currentIndex,
+      nextPrevChapterPair,
+      onPreviousChapter,
+      onPrevious,
+    ]);
 
     useEffect(() {
       StreamSubscription<HardwareButton>? subscription;
@@ -438,14 +423,7 @@ class ReaderWrapper extends HookConsumerWidget {
                           shape: const CircleBorder(),
                           child: IconButton(
                             onPressed: nextPrevChapterPair?.second != null
-                                ? () => ReaderRoute(
-                                      mangaId:
-                                          nextPrevChapterPair!.second!.mangaId,
-                                      chapterId: nextPrevChapterPair.second!.id,
-                                      toPrev: true,
-                                      transVertical:
-                                          scrollDirection != Axis.vertical,
-                                    ).pushReplacement(context)
+                                ? onPreviousChapter
                                 : null,
                             icon: const Icon(
                               Icons.skip_previous_rounded,
@@ -455,7 +433,7 @@ class ReaderWrapper extends HookConsumerWidget {
                         Expanded(
                           child: PageNumberSlider(
                             currentValue: currentIndex,
-                            maxValue: chapterPages.chapter.pageCount,
+                            maxValue: actualPageCount,
                             onChanged: (index) => onChanged(index),
                             inverted: invertTap,
                           ),
@@ -464,13 +442,7 @@ class ReaderWrapper extends HookConsumerWidget {
                           shape: const CircleBorder(),
                           child: IconButton(
                             onPressed: nextPrevChapterPair?.first != null
-                                ? () => ReaderRoute(
-                                      mangaId:
-                                          nextPrevChapterPair!.first!.mangaId,
-                                      chapterId: nextPrevChapterPair.first!.id,
-                                      transVertical:
-                                          scrollDirection != Axis.vertical,
-                                    ).pushReplacement(context)
+                                ? onNextChapter
                                 : null,
                             icon: const Icon(Icons.skip_next_rounded),
                           ),
@@ -521,37 +493,26 @@ class ReaderWrapper extends HookConsumerWidget {
               )
             : null,
         body: Shortcuts.manager(
-          manager: readerShortcutManager(scrollDirection),
+          manager: readerShortcutManager(scrollDirection, resolvedReaderMode),
           child: Actions(
             actions: {
               PreviousScrollIntent: CallbackAction<PreviousScrollIntent>(
-                onInvoke: (intent) =>
-                    invertTap ? enhancedOnNext() : enhancedOnPrevious(),
+                onInvoke: (intent) => enhancedOnPrevious(),
               ),
               NextScrollIntent: CallbackAction<NextScrollIntent>(
-                onInvoke: (intent) =>
-                    invertTap ? enhancedOnPrevious() : enhancedOnNext(),
+                onInvoke: (intent) => enhancedOnNext(),
               ),
               PreviousChapterIntent: CallbackAction<PreviousChapterIntent>(
                 onInvoke: (intent) {
                   nextPrevChapterPair?.second != null
-                      ? ReaderRoute(
-                          mangaId: nextPrevChapterPair!.second!.mangaId,
-                          chapterId: nextPrevChapterPair.second!.id,
-                          toPrev: true,
-                          transVertical: scrollDirection != Axis.vertical,
-                        ).pushReplacement(context)
+                      ? onPreviousChapter()
                       : enhancedOnPrevious();
                   return null;
                 },
               ),
               NextChapterIntent: CallbackAction<NextChapterIntent>(
                 onInvoke: (intent) => nextPrevChapterPair?.first != null
-                    ? ReaderRoute(
-                        mangaId: nextPrevChapterPair!.first!.mangaId,
-                        chapterId: nextPrevChapterPair.first!.id,
-                        transVertical: scrollDirection != Axis.vertical,
-                      ).pushReplacement(context)
+                    ? onNextChapter()
                     : enhancedOnNext(),
               ),
               HideQuickOpenIntent: CallbackAction<HideQuickOpenIntent>(
@@ -569,11 +530,12 @@ class ReaderWrapper extends HookConsumerWidget {
                     toggleVisibility: () =>
                         visibility.value = !visibility.value,
                     scrollDirection: scrollDirection,
-                    mangaId: manga.id,
                     mangaReaderPadding: mangaReaderPadding.value,
                     mangaReaderMagnifierSize: mangaReaderMagnifierSize.value,
                     onNext: enhancedOnNext,
                     onPrevious: enhancedOnPrevious,
+                    onNextChapter: onNextChapter,
+                    onPreviousChapter: onPreviousChapter,
                     mangaReaderNavigationLayout: mangaReaderNavigationLayout,
                     prevNextChapterPair: nextPrevChapterPair,
                     readerSwipeChapterToggle: readerSwipeChapterToggle,
@@ -583,15 +545,7 @@ class ReaderWrapper extends HookConsumerWidget {
                     chapterPages: chapterPages,
                     showReaderLayoutAnimation: showReaderLayoutAnimation,
                     pageController: pageController,
-                    child: _buildEnhancedChildWithPageDetection(
-                      child,
-                      lastPageSwipeEnabled,
-                      readerSwipeChapterToggle,
-                      onNextChapter,
-                      onPreviousChapter,
-                      resolvedReaderMode,
-                      scrollDirection,
-                    ),
+                    child: child,
                   ),
                 ),
               ),
@@ -601,228 +555,6 @@ class ReaderWrapper extends HookConsumerWidget {
       ),
     );
   }
-
-  /// Enhanced child widget that adds last-page swipe detection for PageView
-  Widget _buildEnhancedChildWithPageDetection(
-    Widget originalChild,
-    bool lastPageSwipeEnabled,
-    bool readerSwipeChapterToggle,
-    VoidCallback onNextChapter,
-    VoidCallback onPreviousChapter,
-    ReaderMode resolvedReaderMode,
-    Axis scrollDirection,
-  ) {
-    if (!lastPageSwipeEnabled || readerSwipeChapterToggle) {
-      return originalChild;
-    }
-
-    return _PageViewEnhancer(
-      originalChild: originalChild,
-      chapterPages: chapterPages,
-      onNextChapter: onNextChapter,
-      onPreviousChapter: onPreviousChapter,
-      resolvedReaderMode: resolvedReaderMode,
-      scrollDirection: scrollDirection,
-      lastPageSwipeEnabled: lastPageSwipeEnabled,
-    );
-  }
-}
-
-/// Widget that enhances PageView with last-page swipe detection
-class _PageViewEnhancer extends StatefulWidget {
-  const _PageViewEnhancer({
-    required this.originalChild,
-    required this.chapterPages,
-    required this.onNextChapter,
-    required this.onPreviousChapter,
-    required this.resolvedReaderMode,
-    required this.scrollDirection,
-    required this.lastPageSwipeEnabled,
-  });
-
-  final Widget originalChild;
-  final ChapterPagesDto chapterPages;
-  final VoidCallback onNextChapter;
-  final VoidCallback onPreviousChapter;
-  final ReaderMode resolvedReaderMode;
-  final Axis scrollDirection;
-  final bool lastPageSwipeEnabled;
-
-  @override
-  State<_PageViewEnhancer> createState() => _PageViewEnhancerState();
-}
-
-class _PageViewEnhancerState extends State<_PageViewEnhancer> {
-  int? _lastPageIndex;
-  bool _isAtMaxExtent = false;
-  bool _isAtMinExtent = false;
-  DateTime? _maxExtentReachedTime;
-  DateTime? _minExtentReachedTime;
-  bool _edgeNavTriggered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (ScrollNotification notification) {
-        // Track page changes and detect swipe attempts at boundaries
-        if (notification is ScrollEndNotification && notification.depth == 0) {
-          final metrics = notification.metrics;
-          if (metrics is PageMetrics) {
-            final currentPage = metrics.page?.round();
-            if (currentPage != null) {
-              final oldPage = _lastPageIndex;
-              _lastPageIndex = currentPage;
-
-              // Check if this was a boundary swipe attempt
-              _checkBoundarySwipe(oldPage, currentPage, metrics);
-            }
-          }
-        }
-
-        // Also check scroll update notifications for swipe attempts
-        if (notification is ScrollUpdateNotification &&
-            notification.depth == 0) {
-          final metrics = notification.metrics;
-          _checkScrollAttemptAtBoundary(metrics);
-        }
-
-        // For webtoon: detect overscroll attempts using OverscrollNotification
-        if (notification is OverscrollNotification && notification.depth == 0) {
-          _handleWebtoonOverscroll(notification);
-        }
-
-        return false;
-      },
-      child: widget.originalChild,
-    );
-  }
-
-  void _checkBoundarySwipe(int? oldPage, int currentPage, PageMetrics metrics) {
-    // We now rely solely on overscroll detection, so do nothing here.
-    return;
-  }
-
-  void _checkScrollAttemptAtBoundary(ScrollMetrics metrics) {
-    // Handle both PageMetrics (for PageView) and general ScrollMetrics (for Webtoon)
-    if (metrics is PageMetrics) {
-      // PageView-based readers (horizontal modes)
-      final currentPage = metrics.page?.round() ?? 0;
-      final totalPages = widget.chapterPages.pages.length;
-
-      final bool atLastPage = currentPage >= (totalPages - 1);
-      final bool atFirstPage = currentPage <= 0;
-
-      // Trigger immediately when user drags past edge more than 10 logical pixels
-      const double kOverscrollThreshold = 10.0;
-
-      if (widget.lastPageSwipeEnabled) {
-        if (atLastPage &&
-            metrics.pixels - metrics.maxScrollExtent > kOverscrollThreshold) {
-          if (!_edgeNavTriggered) {
-            _edgeNavTriggered = true;
-            widget.onNextChapter();
-          }
-        } else if (atFirstPage &&
-            metrics.minScrollExtent - metrics.pixels > kOverscrollThreshold) {
-          if (!_edgeNavTriggered) {
-            _edgeNavTriggered = true;
-            widget.onPreviousChapter();
-          }
-        }
-      }
-
-      _isAtMaxExtent = metrics.pixels >= metrics.maxScrollExtent;
-      _isAtMinExtent = metrics.pixels <= metrics.minScrollExtent;
-
-      if (!_isAtMaxExtent && !_isAtMinExtent) {
-        _edgeNavTriggered = false;
-      }
-    } else {
-      // Continuous scroll readers (webtoon, vertical modes)
-      // Track when we're at boundaries for overscroll detection
-      final wasAtMaxExtent = _isAtMaxExtent;
-      final wasAtMinExtent = _isAtMinExtent;
-
-      _isAtMaxExtent = metrics.pixels >= metrics.maxScrollExtent;
-      _isAtMinExtent = metrics.pixels <= metrics.minScrollExtent;
-
-      // Track timing when we reach boundaries to distinguish momentum from deliberate swipes
-      if (_isAtMaxExtent && !wasAtMaxExtent) {
-        _maxExtentReachedTime = DateTime.now();
-      }
-      if (_isAtMinExtent && !wasAtMinExtent) {
-        _minExtentReachedTime = DateTime.now();
-      }
-
-      // Reset timing when leaving boundaries
-      if (!_isAtMaxExtent && wasAtMaxExtent) {
-        _maxExtentReachedTime = null;
-      }
-      if (!_isAtMinExtent && wasAtMinExtent) {
-        _minExtentReachedTime = null;
-      }
-
-      if (!_isAtMaxExtent && !_isAtMinExtent) {
-        _edgeNavTriggered = false;
-      }
-    }
-  }
-
-  void _handleWebtoonOverscroll(OverscrollNotification notification) {
-    // Safety check: only process if last page swipe is enabled
-    if (!widget.lastPageSwipeEnabled) {
-      return;
-    }
-
-    final now = DateTime.now();
-    // Use shorter delay for PageView (paged readers) to feel more responsive
-    final bool isPagedReader = notification.metrics is PageMetrics;
-    final int triggerDelayMs = isPagedReader ? 50 : 300;
-
-    const double kImmediateThreshold = 2.0;
-
-    // For PageView (paged reader) fire immediately once overscroll crosses tiny threshold
-    if (isPagedReader) {
-      if (_isAtMaxExtent && notification.overscroll > kImmediateThreshold) {
-        if (!_edgeNavTriggered) {
-          _edgeNavTriggered = true;
-          widget.onNextChapter();
-        }
-        return;
-      }
-      if (_isAtMinExtent && notification.overscroll < -kImmediateThreshold) {
-        if (!_edgeNavTriggered) {
-          _edgeNavTriggered = true;
-          widget.onPreviousChapter();
-        }
-        return;
-      }
-    }
-
-    // Fallback for continuous readers (webtoon) – keep delay logic
-    // Check for overscroll at the end (positive overscroll when at max extent)
-    if (_isAtMaxExtent && notification.overscroll > 0) {
-      if (_maxExtentReachedTime != null &&
-          now.difference(_maxExtentReachedTime!).inMilliseconds >
-              triggerDelayMs) {
-        if (!_edgeNavTriggered) {
-          _edgeNavTriggered = true;
-          widget.onNextChapter();
-        }
-      }
-    }
-
-    if (_isAtMinExtent && notification.overscroll < 0) {
-      if (_minExtentReachedTime != null &&
-          now.difference(_minExtentReachedTime!).inMilliseconds >
-              triggerDelayMs) {
-        if (!_edgeNavTriggered) {
-          _edgeNavTriggered = true;
-          widget.onPreviousChapter();
-        }
-      }
-    }
-  }
 }
 
 class ReaderView extends HookWidget {
@@ -830,11 +562,12 @@ class ReaderView extends HookWidget {
     super.key,
     required this.toggleVisibility,
     required this.scrollDirection,
-    required this.mangaId,
     required this.mangaReaderPadding,
     required this.mangaReaderMagnifierSize,
     required this.onNext,
     required this.onPrevious,
+    required this.onNextChapter,
+    required this.onPreviousChapter,
     required this.prevNextChapterPair,
     required this.mangaReaderNavigationLayout,
     required this.readerSwipeChapterToggle,
@@ -849,11 +582,12 @@ class ReaderView extends HookWidget {
 
   final VoidCallback toggleVisibility;
   final Axis scrollDirection;
-  final int mangaId;
   final double mangaReaderPadding;
   final double mangaReaderMagnifierSize;
   final VoidCallback onNext;
   final VoidCallback onPrevious;
+  final VoidCallback onNextChapter;
+  final VoidCallback onPreviousChapter;
   final ({ChapterDto? first, ChapterDto? second})? prevNextChapterPair;
   final ReaderNavigationLayout mangaReaderNavigationLayout;
   final bool readerSwipeChapterToggle;
@@ -914,10 +648,11 @@ class ReaderView extends HookWidget {
       resolvedReaderMode: resolvedReaderMode,
       currentIndex: currentIndex,
       chapterPages: chapterPages,
-      mangaId: mangaId,
       prevNextChapterPair: prevNextChapterPair,
       onNextPage: onNext,
       onPreviousPage: onPrevious,
+      onNextChapter: onNextChapter,
+      onPreviousChapter: onPreviousChapter,
       pageController: controller,
       child: content,
     );
@@ -928,6 +663,7 @@ class ReaderView extends HookWidget {
         ReaderNavigationLayoutWidget(
           onNext: onNext,
           onPrevious: onPrevious,
+          resolvedReaderMode: resolvedReaderMode,
           navigationLayout: mangaReaderNavigationLayout,
           showReaderLayoutAnimation: showReaderLayoutAnimation,
         ),

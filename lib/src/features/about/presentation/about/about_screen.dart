@@ -201,20 +201,20 @@ class AboutScreen extends HookConsumerWidget {
                 children: [
                   MediaLaunchButton(
                     title: "${context.l10n.gitHub} ",
-                    iconData: FontAwesomeIcons.github,
+                    icon: const FaIcon(FontAwesomeIcons.github),
                     url: AppUrls.sorayomiGithubUrl.url,
                     toast: toast,
                   ),
                   if ((about?.discord).isNotBlank)
                     MediaLaunchButton(
                       title: context.l10n.discord,
-                      iconData: FontAwesomeIcons.discord,
+                      icon: const FaIcon(FontAwesomeIcons.discord),
                       url: about!.discord,
                       toast: toast,
                     ),
                   MediaLaunchButton(
                     title: context.l10n.reddit,
-                    iconData: FontAwesomeIcons.reddit,
+                    icon: const FaIcon(FontAwesomeIcons.reddit),
                     url: AppUrls.tachideskReddit.url,
                     toast: toast,
                   ),

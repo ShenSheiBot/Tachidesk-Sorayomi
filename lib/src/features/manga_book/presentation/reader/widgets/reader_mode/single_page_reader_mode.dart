@@ -46,12 +46,18 @@ class SinglePageReaderMode extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cacheManager = useMemoized(() => DefaultCacheManager());
+    final lastPageIndex =
+        chapterPages.pages.isEmpty ? 0 : chapterPages.pages.length - 1;
+    final initialPage = chapter.isRead.ifNull()
+        ? 0
+        : chapter.lastPageRead
+            .getValueOnNullOrNegative()
+            .clamp(0, lastPageIndex)
+            .toInt();
     final scrollController = usePageController(
-      initialPage: chapter.isRead.ifNull()
-          ? 0
-          : chapter.lastPageRead.getValueOnNullOrNegative(),
+      initialPage: initialPage,
     );
-    final currentIndex = useState(scrollController.initialPage);
+    final currentIndex = useState(initialPage);
 
     useEffect(() {
       if (onPageChanged != null) onPageChanged!(currentIndex.value);
@@ -63,6 +69,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
           cacheManager.getServerFile(
             ref,
             chapterPages.pages[currentPage - 1],
+            appendApiToUrl: false,
           );
         }
         // Next page
@@ -70,6 +77,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
           cacheManager.getServerFile(
             ref,
             chapterPages.pages[currentPage + 1],
+            appendApiToUrl: false,
           );
         }
         // 2nd next page
@@ -77,6 +85,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
           cacheManager.getServerFile(
             ref,
             chapterPages.pages[currentPage + 2],
+            appendApiToUrl: false,
           );
         }
       }
@@ -133,6 +142,9 @@ class SinglePageReaderMode extends HookConsumerWidget {
           }
 
           final image = ServerImage(
+            key: ValueKey(
+              'single-page-${chapter.id}-$index-${chapterPages.pages[index]}',
+            ),
             showReloadButton: true,
             fit: BoxFit.contain,
             size: Size.fromHeight(context.height),

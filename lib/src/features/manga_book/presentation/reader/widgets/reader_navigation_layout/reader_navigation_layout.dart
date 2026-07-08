@@ -22,11 +22,13 @@ class ReaderNavigationLayoutWidget extends HookConsumerWidget {
   const ReaderNavigationLayoutWidget({
     super.key,
     this.navigationLayout,
+    required this.resolvedReaderMode,
     required this.onPrevious,
     required this.onNext,
     this.showReaderLayoutAnimation = false,
   });
   final ReaderNavigationLayout? navigationLayout;
+  final ReaderMode resolvedReaderMode;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final bool showReaderLayoutAnimation;
@@ -51,11 +53,18 @@ class ReaderNavigationLayoutWidget extends HookConsumerWidget {
         ? ref.watch(readerNavigationLayoutKeyProvider)
         : navigationLayout;
     final invertTap = ref.watch(invertTapProvider).ifNull();
+    final isHorizontalRtl = switch (resolvedReaderMode) {
+      ReaderMode.singleHorizontalRTL ||
+      ReaderMode.continuousHorizontalRTL =>
+        true,
+      _ => false,
+    };
+    final nextOnLeft = isHorizontalRtl != invertTap;
     final VoidCallback? onLeftTap;
     final VoidCallback? onRightTap;
     final Color? leftColor;
     final Color? rightColor;
-    if (invertTap) {
+    if (nextOnLeft) {
       onLeftTap = onNext;
       onRightTap = onPrevious;
       leftColor = nextColorTween;
