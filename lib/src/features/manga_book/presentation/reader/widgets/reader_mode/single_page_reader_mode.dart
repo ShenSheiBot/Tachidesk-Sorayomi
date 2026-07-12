@@ -22,6 +22,7 @@ import '../../../../../settings/presentation/reader/widgets/reader_scroll_animat
 import '../../../../domain/chapter/chapter_model.dart';
 import '../../../../domain/chapter_page/chapter_page_model.dart';
 import '../../../../domain/manga/manga_model.dart';
+import '../../navigation/reader_navigation.dart';
 import '../reader_wrapper.dart';
 
 class SinglePageReaderMode extends HookConsumerWidget {
@@ -31,17 +32,19 @@ class SinglePageReaderMode extends HookConsumerWidget {
     required this.chapter,
     required this.chapterPages,
     required this.initialOverlayVisible,
+    required this.navigation,
+    required this.beforeChapterChange,
+    required this.onChapterChangeCommitted,
     this.onPageChanged,
-    this.reverse = false,
-    this.scrollDirection = Axis.horizontal,
     this.showReaderLayoutAnimation = false,
   });
 
   final MangaDto manga;
   final ChapterDto chapter;
   final ValueSetter<int>? onPageChanged;
-  final bool reverse;
-  final Axis scrollDirection;
+  final ResolvedReaderNavigation navigation;
+  final AsyncCallback beforeChapterChange;
+  final VoidCallback onChapterChangeCommitted;
   final bool showReaderLayoutAnimation;
   final bool initialOverlayVisible;
   final ChapterPagesDto chapterPages;
@@ -60,6 +63,14 @@ class SinglePageReaderMode extends HookConsumerWidget {
       initialPage: initialPage,
     );
     final currentIndex = useState(initialPage);
+    final navigationState = useState(
+      ReaderNavigationState(
+        displayPageIndex: initialPage,
+        atStart: chapterPages.pages.isEmpty || initialPage == 0,
+        atEnd: chapterPages.pages.isEmpty || initialPage == lastPageIndex,
+        isBusy: false,
+      ),
+    );
 
     useEffect(() {
       if (onPageChanged != null) onPageChanged!(currentIndex.value);
@@ -93,79 +104,148 @@ class SinglePageReaderMode extends HookConsumerWidget {
       }
       return null;
     }, [currentIndex.value, chapterPages.pages.length]);
-    useEffect(() {
-      listener() {
-        final currentPage = scrollController.page;
-        if (currentPage != null) currentIndex.value = (currentPage.toInt());
-      }
-
-      scrollController.addListener(listener);
-      return () => scrollController.removeListener(listener);
-    }, [scrollController]);
     final isAnimationEnabled =
         ref.read(readerScrollAnimationProvider).ifNull(true);
+
+    final stepPage = useCallback<ReaderPageStep>((direction) async {
+      if (chapterPages.pages.isEmpty || !scrollController.hasClients) {
+        return ReaderPageStepResult.unavailable;
+      }
+
+      final settledPage = scrollController.page?.round() ?? currentIndex.value;
+      final delta = direction == ReadingDirection.forward ? 1 : -1;
+      final targetPage = settledPage + delta;
+      if (targetPage < 0 || targetPage > lastPageIndex) {
+        return ReaderPageStepResult.atBoundary;
+      }
+
+      navigationState.value = navigationState.value.copyWith(isBusy: true);
+      try {
+        if (isAnimationEnabled) {
+          await scrollController.animateToPage(
+            targetPage,
+            duration: kDuration,
+            curve: kCurve,
+          );
+        } else {
+          scrollController.jumpToPage(targetPage);
+          await WidgetsBinding.instance.endOfFrame;
+        }
+      } finally {
+        if (context.mounted) {
+          navigationState.value = navigationState.value.copyWith(isBusy: false);
+        }
+      }
+      return ReaderPageStepResult.moved;
+    }, [
+      chapterPages.pages.length,
+      currentIndex.value,
+      isAnimationEnabled,
+      lastPageIndex,
+      navigationState,
+      scrollController,
+    ]);
+
+    final jumpToPage = useCallback<ReaderPageJump>((index) async {
+      if (!scrollController.hasClients || chapterPages.pages.isEmpty) return;
+      navigationState.value = navigationState.value.copyWith(isBusy: true);
+      try {
+        scrollController.jumpToPage(index.clamp(0, lastPageIndex));
+        await WidgetsBinding.instance.endOfFrame;
+      } finally {
+        if (context.mounted) {
+          navigationState.value = navigationState.value.copyWith(isBusy: false);
+        }
+      }
+    }, [
+      chapterPages.pages.length,
+      lastPageIndex,
+      navigationState,
+      scrollController,
+    ]);
+
+    bool trackUserScrolling(ScrollNotification notification) {
+      if (notification.depth != 0) return false;
+      if (notification is ScrollStartNotification &&
+          notification.dragDetails != null) {
+        navigationState.value = navigationState.value.copyWith(isBusy: true);
+      } else if (notification is ScrollEndNotification) {
+        navigationState.value = navigationState.value.copyWith(isBusy: false);
+      }
+      return false;
+    }
+
     return ReaderWrapper(
-      scrollDirection: scrollDirection,
+      navigation: navigation,
       chapter: chapter,
       manga: manga,
       chapterPages: chapterPages,
-      currentIndex: currentIndex.value,
+      navigationState: navigationState,
       initialOverlayVisible: initialOverlayVisible,
-      onChanged: (index) => scrollController.jumpToPage(index),
+      onStepPage: stepPage,
+      onJumpToPage: jumpToPage,
+      beforeChapterChange: beforeChapterChange,
+      onChapterChangeCommitted: onChapterChangeCommitted,
       showReaderLayoutAnimation: showReaderLayoutAnimation,
-      onPrevious: () => scrollController.previousPage(
-        duration: isAnimationEnabled ? kDuration : kInstantDuration,
-        curve: kCurve,
-      ),
-      onNext: () => scrollController.nextPage(
-        duration: isAnimationEnabled ? kDuration : kInstantDuration,
-        curve: kCurve,
-      ),
-      pageController: scrollController,
-      child: PageView.builder(
-        scrollDirection: scrollDirection,
-        reverse: reverse,
-        controller: scrollController,
-        allowImplicitScrolling: true,
-        physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics()),
-        itemBuilder: (BuildContext context, int index) {
-          // Show loading indicator if no pages are available yet
-          if (chapterPages.pages.isEmpty) {
-            return const Center(
-              child: CenterSorayomiShimmerIndicator(),
-            );
-          }
+      childBuilder: (_) => NotificationListener<ScrollNotification>(
+        onNotification: trackUserScrolling,
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: PageView.builder(
+            scrollDirection: navigation.axis,
+            reverse: navigation.pageViewReverse,
+            controller: scrollController,
+            allowImplicitScrolling: true,
+            onPageChanged: (index) {
+              currentIndex.value = index;
+              navigationState.value = navigationState.value.copyWith(
+                displayPageIndex: index,
+                atStart: index == 0,
+                atEnd: index == lastPageIndex,
+              );
+            },
+            physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics()),
+            itemBuilder: (BuildContext context, int index) {
+              // Show loading indicator if no pages are available yet
+              if (chapterPages.pages.isEmpty) {
+                return const Center(
+                  child: CenterSorayomiShimmerIndicator(),
+                );
+              }
 
-          // Add bounds checking to prevent accessing non-existent pages
-          if (index >= chapterPages.pages.length) {
-            return const Center(
-              child: CenterSorayomiShimmerIndicator(),
-            );
-          }
+              // Add bounds checking to prevent accessing non-existent pages
+              if (index >= chapterPages.pages.length) {
+                return const Center(
+                  child: CenterSorayomiShimmerIndicator(),
+                );
+              }
 
-          final image = ServerImage(
-            key: ValueKey(
-              'single-page-${chapter.id}-$index-${chapterPages.pages[index]}',
-            ),
-            showReloadButton: true,
-            fit: BoxFit.contain,
-            size: Size.fromHeight(context.height),
-            appendApiToUrl: false,
-            imageUrl: chapterPages.pages[index],
-            progressIndicatorBuilder: (context, url, downloadProgress) =>
-                CenterSorayomiShimmerIndicator(
-              value: downloadProgress.progress,
-            ),
-          );
-          return AppUtils.wrapOn(
-            !kIsWeb && (Platform.isAndroid || Platform.isIOS)
-                ? (child) => InteractiveViewer(maxScale: 5, child: child)
-                : null,
-            image,
-          );
-        },
-        itemCount: chapterPages.pages.isEmpty ? 1 : chapterPages.pages.length,
+              final image = ServerImage(
+                key: ValueKey(
+                  'single-page-${chapter.id}-$index-${chapterPages.pages[index]}',
+                ),
+                showReloadButton: true,
+                fit: BoxFit.contain,
+                size: Size.fromHeight(context.height),
+                appendApiToUrl: false,
+                imageUrl: chapterPages.pages[index],
+                progressIndicatorBuilder: (context, url, downloadProgress) =>
+                    CenterSorayomiShimmerIndicator(
+                  value: downloadProgress.progress,
+                ),
+              );
+              return AppUtils.wrapOn(
+                !kIsWeb && (Platform.isAndroid || Platform.isIOS)
+                    ? (child) => InteractiveViewer(maxScale: 5, child: child)
+                    : null,
+                image,
+              );
+            },
+            itemCount:
+                chapterPages.pages.isEmpty ? 1 : chapterPages.pages.length,
+          ),
+        ),
       ),
     );
   }

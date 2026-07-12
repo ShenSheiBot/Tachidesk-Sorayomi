@@ -179,7 +179,7 @@ ChapterDto? firstUnreadInFilteredChapterList(
 }
 
 @riverpod
-({ChapterDto? first, ChapterDto? second})? getNextAndPreviousChapters(
+({ChapterDto? next, ChapterDto? previous})? getNextAndPreviousVisibleChapters(
   Ref ref, {
   required int mangaId,
   required int chapterId,
@@ -202,8 +202,8 @@ ChapterDto? firstUnreadInFilteredChapterList(
     final nextChapter =
         current < (filteredList.length - 1) ? filteredList[current + 1] : null;
     return (
-      first: shouldAscSort && isAscSorted ? nextChapter : prevChapter,
-      second: shouldAscSort && isAscSorted ? prevChapter : nextChapter,
+      next: shouldAscSort && isAscSorted ? nextChapter : prevChapter,
+      previous: shouldAscSort && isAscSorted ? prevChapter : nextChapter,
     );
   }
 }

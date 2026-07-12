@@ -6,34 +6,33 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../../../../constants/app_constants.dart';
 import '../../../../../../constants/enum.dart';
-import '../../../../../../utils/extensions/custom_extensions.dart';
-import '../../../../../settings/presentation/reader/widgets/reader_invert_tap_tile/reader_invert_tap_tile.dart';
-import '../../../../../settings/presentation/reader/widgets/reader_navigation_layout_tile/reader_navigation_layout_tile.dart';
+import '../../navigation/reader_navigation.dart';
 import 'layouts/edge_layout.dart';
 import 'layouts/kindlish_layout.dart';
 import 'layouts/l_shaped_layout.dart';
 import 'layouts/right_and_left_layout.dart';
 
-class ReaderNavigationLayoutWidget extends HookConsumerWidget {
+class ReaderNavigationLayoutWidget extends HookWidget {
   const ReaderNavigationLayoutWidget({
     super.key,
     this.navigationLayout,
-    required this.resolvedReaderMode,
+    required this.navigation,
+    required this.invertTap,
     required this.onPrevious,
     required this.onNext,
     this.showReaderLayoutAnimation = false,
   });
   final ReaderNavigationLayout? navigationLayout;
-  final ReaderMode resolvedReaderMode;
+  final ResolvedReaderNavigation navigation;
+  final bool invertTap;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final bool showReaderLayoutAnimation;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final animationController = useAnimationController(duration: kLongDuration);
     useAnimation(animationController);
     final nextColorTween = ColorTween(
@@ -48,18 +47,8 @@ class ReaderNavigationLayoutWidget extends HookConsumerWidget {
       return;
     }, []);
 
-    final layout = navigationLayout == null ||
-            navigationLayout == ReaderNavigationLayout.defaultNavigation
-        ? ref.watch(readerNavigationLayoutKeyProvider)
-        : navigationLayout;
-    final invertTap = ref.watch(invertTapProvider).ifNull();
-    final isHorizontalRtl = switch (resolvedReaderMode) {
-      ReaderMode.singleHorizontalRTL ||
-      ReaderMode.continuousHorizontalRTL =>
-        true,
-      _ => false,
-    };
-    final nextOnLeft = isHorizontalRtl != invertTap;
+    final layout = navigationLayout;
+    final nextOnLeft = navigation.isHorizontalRtl != invertTap;
     final VoidCallback? onLeftTap;
     final VoidCallback? onRightTap;
     final Color? leftColor;

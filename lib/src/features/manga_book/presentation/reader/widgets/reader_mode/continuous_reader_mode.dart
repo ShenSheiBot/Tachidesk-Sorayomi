@@ -4,7 +4,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -22,20 +21,9 @@ import '../../../../../settings/presentation/reader/widgets/reader_scroll_animat
 import '../../../../domain/chapter/chapter_model.dart';
 import '../../../../domain/chapter_page/chapter_page_model.dart';
 import '../../../../domain/manga/manga_model.dart';
+import '../../navigation/reader_navigation.dart';
 import '../chapter_separator.dart';
 import '../reader_wrapper.dart';
-
-/// Configuration constants for improved scroll behavior
-class _ScrollConfig {
-  const _ScrollConfig._();
-
-  /// Normal visibility threshold for position tracking
-  static const double minVisibleAreaThreshold = 0.4;
-
-  /// Extended delay only for programmatic navigation to prevent jumps
-  static const Duration programmaticNavigationDelay =
-      Duration(milliseconds: 800);
-}
 
 class ContinuousReaderMode extends HookConsumerWidget {
   const ContinuousReaderMode({
@@ -44,29 +32,31 @@ class ContinuousReaderMode extends HookConsumerWidget {
     required this.chapter,
     required this.chapterPages,
     required this.initialOverlayVisible,
+    required this.navigation,
+    required this.beforeChapterChange,
+    required this.onChapterChangeCommitted,
     this.showSeparator = false,
     this.onPageChanged,
-    this.scrollDirection = Axis.vertical,
-    this.reverse = false,
     this.showReaderLayoutAnimation = false,
   });
+
+  static const _positionEpsilon = 0.001;
 
   final MangaDto manga;
   final ChapterDto chapter;
   final bool showSeparator;
   final ValueSetter<int>? onPageChanged;
-  final Axis scrollDirection;
-  final bool reverse;
+  final ResolvedReaderNavigation navigation;
+  final AsyncCallback beforeChapterChange;
+  final VoidCallback onChapterChangeCommitted;
   final bool showReaderLayoutAnimation;
   final bool initialOverlayVisible;
   final ChapterPagesDto chapterPages;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ItemScrollController scrollController =
-        useMemoized(() => ItemScrollController());
-    final ItemPositionsListener positionsListener =
-        useMemoized(() => ItemPositionsListener.create());
+    final scrollController = useMemoized(ItemScrollController.new);
+    final positionsListener = useMemoized(ItemPositionsListener.create);
     final actualPageCount = chapterPages.pages.length;
     final lastPageIndex = actualPageCount == 0 ? 0 : actualPageCount - 1;
     final initialPage = chapter.isRead.ifNull()
@@ -75,343 +65,293 @@ class ContinuousReaderMode extends HookConsumerWidget {
             .getValueOnNullOrNegative()
             .clamp(0, lastPageIndex)
             .toInt();
-
-    final ValueNotifier<int> currentIndex = useState(
-      initialPage,
+    final navigationState = useState(
+      ReaderNavigationState(
+        displayPageIndex: initialPage,
+        atStart: actualPageCount == 0,
+        atEnd: actualPageCount == 0,
+        isBusy: false,
+      ),
     );
 
-    // Passive position tracking that doesn't interfere with scrolling
-    final ObjectRef<Timer?> positionUpdateTimer = useRef<Timer?>(null);
-    final ObjectRef<Timer?> sliderResetTimer = useRef<Timer?>(null);
-    final ValueNotifier<bool> isUserScrolling = useState(false);
-    final ValueNotifier<bool> isNavigatingFromSlider = useState(false);
-    final ValueNotifier<int> lastReportedIndex = useState(-1);
-
-    // Dispose timer properly
     useEffect(() {
-      return () {
-        positionUpdateTimer.value?.cancel();
-        positionUpdateTimer.value = null;
-        sliderResetTimer.value?.cancel();
-        sliderResetTimer.value = null;
-      };
-    }, []);
+      void updateViewport() {
+        if (!context.mounted) return;
+        navigationState.value = projectNavigationState(
+          positions: positionsListener.itemPositions.value,
+          pageCount: actualPageCount,
+          previous: navigationState.value,
+        );
+      }
 
-    // Enhanced position tracking that allows UI updates but prevents jumps
+      positionsListener.itemPositions.addListener(updateViewport);
+      WidgetsBinding.instance.addPostFrameCallback((_) => updateViewport());
+      return () =>
+          positionsListener.itemPositions.removeListener(updateViewport);
+    }, [actualPageCount, positionsListener]);
+
     useEffect(() {
-      void listener() {
-        final List<ItemPosition> positions =
-            positionsListener.itemPositions.value.toList();
+      onPageChanged?.call(navigationState.value.displayPageIndex);
+      return null;
+    }, [navigationState.value.displayPageIndex]);
 
-        if (positions.isEmpty) return;
+    final isAnimationEnabled =
+        ref.read(readerScrollAnimationProvider).ifNull(true);
+    final isPinchToZoomEnabled = ref.read(pinchToZoomProvider).ifNull(true);
 
-        // Don't update position if we're navigating from slider
-        if (!isNavigatingFromSlider.value) {
-          // Always update position for UI display (navigation bar needs this)
-          _updatePositionForDisplay(
-            positions,
-            currentIndex,
-            lastPageIndex,
+    Future<void> scrollToItem(int itemIndex) async {
+      navigationState.value = navigationState.value.copyWith(isBusy: true);
+      try {
+        if (isAnimationEnabled) {
+          await scrollController.scrollTo(
+            index: itemIndex,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        } else {
+          scrollController.jumpTo(index: itemIndex);
+          await WidgetsBinding.instance.endOfFrame;
+        }
+      } finally {
+        if (context.mounted) {
+          navigationState.value = projectNavigationState(
+            positions: positionsListener.itemPositions.value,
+            pageCount: actualPageCount,
+            previous: navigationState.value.copyWith(isBusy: false),
           );
         }
+      }
+    }
 
-        // Mark as user scrolling to prevent programmatic navigation
-        isUserScrolling.value = true;
-
-        // Cancel any pending programmatic navigation
-        positionUpdateTimer.value?.cancel();
-
-        // Only allow programmatic navigation after extended delay
-        positionUpdateTimer.value =
-            Timer(_ScrollConfig.programmaticNavigationDelay, () {
-          isUserScrolling.value = false;
-          isNavigatingFromSlider.value = false; // Reset slider navigation flag
-        });
+    final stepPage = useCallback<ReaderPageStep>((direction) async {
+      if (actualPageCount == 0 ||
+          !scrollController.isAttached ||
+          positionsListener.itemPositions.value.isEmpty) {
+        return ReaderPageStepResult.unavailable;
       }
 
-      positionsListener.itemPositions.addListener(listener);
-      return () {
-        positionsListener.itemPositions.removeListener(listener);
-        positionUpdateTimer.value?.cancel();
-      };
-    }, []);
-
-    // Notify page changes for UI updates (navigation bar) but prevent programmatic jumps
-    useEffect(() {
-      final ValueSetter<int>? pageChanged = onPageChanged;
-      if (pageChanged != null &&
-          lastReportedIndex.value != currentIndex.value) {
-        // Always notify for UI display updates
-        pageChanged(currentIndex.value);
-        lastReportedIndex.value = currentIndex.value;
+      final state = navigationState.value;
+      if ((direction == ReadingDirection.forward && state.atEnd) ||
+          (direction == ReadingDirection.backward && state.atStart)) {
+        return ReaderPageStepResult.atBoundary;
       }
-      return null;
-    }, [currentIndex.value]); // Only watch currentIndex changes
 
-    final bool isAnimationEnabled =
-        ref.read(readerScrollAnimationProvider).ifNull(true);
-    final bool isPinchToZoomEnabled =
-        ref.read(pinchToZoomProvider).ifNull(true);
+      final targetItem = targetItemForStep(
+        direction: direction,
+        state: state,
+        pageCount: actualPageCount,
+      );
+      await scrollToItem(targetItem);
+      return ReaderPageStepResult.moved;
+    }, [
+      actualPageCount,
+      isAnimationEnabled,
+      lastPageIndex,
+      navigationState,
+      positionsListener,
+      scrollController,
+    ]);
+
+    final jumpToPage = useCallback<ReaderPageJump>((index) async {
+      if (actualPageCount == 0 || !scrollController.isAttached) return;
+      final pageIndex = index.clamp(0, lastPageIndex);
+      await scrollToItem(pageIndex + 1);
+    }, [
+      actualPageCount,
+      isAnimationEnabled,
+      lastPageIndex,
+      navigationState,
+      positionsListener,
+      scrollController,
+    ]);
+
+    bool trackUserScrolling(ScrollNotification notification) {
+      if (notification.depth != 0) return false;
+      if (notification is ScrollStartNotification &&
+          notification.dragDetails != null) {
+        navigationState.value = navigationState.value.copyWith(isBusy: true);
+      } else if (notification is ScrollEndNotification) {
+        navigationState.value = projectNavigationState(
+          positions: positionsListener.itemPositions.value,
+          pageCount: actualPageCount,
+          previous: navigationState.value.copyWith(isBusy: false),
+        );
+      }
+      return false;
+    }
+
+    Widget buildList(ReaderContentNavigation contentNavigation) =>
+        NotificationListener<ScrollNotification>(
+          onNotification: trackUserScrolling,
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: ScrollablePositionedList.separated(
+              itemScrollController: scrollController,
+              itemPositionsListener: positionsListener,
+              initialScrollIndex: actualPageCount == 0 ? 0 : initialPage + 1,
+              scrollDirection: navigation.axis,
+              reverse: navigation.pageViewReverse,
+              itemCount: actualPageCount == 0 ? 1 : actualPageCount + 2,
+              minCacheExtent: navigation.axis == Axis.vertical
+                  ? context.height * 2
+                  : context.width * 2,
+              separatorBuilder: (_, __) =>
+                  showSeparator ? const Gap(16) : const SizedBox.shrink(),
+              itemBuilder: (context, itemIndex) {
+                if (actualPageCount == 0) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (itemIndex == 0 || itemIndex == actualPageCount + 1) {
+                  return SizedBox(
+                    height: navigation.axis == Axis.vertical
+                        ? context.height * .5
+                        : null,
+                    width: navigation.axis == Axis.horizontal
+                        ? context.width * .5
+                        : null,
+                    child: ChapterSeparator(
+                      chapter: chapter,
+                      previousChapter: contentNavigation.previousChapter,
+                      nextChapter: contentNavigation.nextChapter,
+                      showChapterButtons: contentNavigation.showChapterButtons,
+                      onChangeChapter: (direction) =>
+                          contentNavigation.onCommand(
+                        ChangeReaderChapter(direction),
+                      ),
+                      isPreviousChapterSeparator: itemIndex == 0,
+                    ),
+                  );
+                }
+
+                final pageIndex = itemIndex - 1;
+                return ServerImage(
+                  key: ValueKey(
+                    'continuous-page-${chapter.id}-$pageIndex-'
+                    '${chapterPages.pages[pageIndex]}',
+                  ),
+                  showReloadButton: true,
+                  fit: navigation.axis == Axis.vertical
+                      ? BoxFit.fitWidth
+                      : BoxFit.fitHeight,
+                  appendApiToUrl: false,
+                  imageUrl: chapterPages.pages[pageIndex],
+                  progressIndicatorBuilder: (_, __, downloadProgress) => Center(
+                    child: CircularProgressIndicator(
+                      value: downloadProgress.progress,
+                    ),
+                  ),
+                  wrapper: (child) => SizedBox(
+                    height: navigation.axis == Axis.vertical
+                        ? context.height * .7
+                        : null,
+                    width: navigation.axis == Axis.horizontal
+                        ? context.width * .7
+                        : null,
+                    child: child,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
 
     return ReaderWrapper(
-      scrollDirection: scrollDirection,
+      navigation: navigation,
       chapterPages: chapterPages,
       chapter: chapter,
       manga: manga,
       showReaderLayoutAnimation: showReaderLayoutAnimation,
-      currentIndex: currentIndex.value,
+      navigationState: navigationState,
       initialOverlayVisible: initialOverlayVisible,
-      onChanged: (index) {
-        // Mark that we're navigating from slider to prevent position interference
-        isNavigatingFromSlider.value = true;
-
-        // Update current index for display
-        currentIndex.value = index;
-
-        // Force navigation for slider - bypass scroll state checks
-        _jumpToPageSafely(
-          scrollController,
-          isUserScrolling,
-          index,
-          forceNavigation: true,
-        );
-
-        // Reset the flag after the navigation completes
-        sliderResetTimer.value?.cancel();
-        sliderResetTimer.value = Timer(const Duration(milliseconds: 300), () {
-          isNavigatingFromSlider.value = false;
-        });
-      },
-      // Disable automatic previous/next navigation for webtoon to prevent jumping
-      onPrevious: () => _handleNavigationSafely(
-        scrollController,
-        positionsListener,
-        isUserScrolling,
-        isAnimationEnabled,
-        lastPageIndex,
-        isNext: false,
-      ),
-      onNext: () => _handleNavigationSafely(
-        scrollController,
-        positionsListener,
-        isUserScrolling,
-        isAnimationEnabled,
-        lastPageIndex,
-        isNext: true,
-      ),
-      child: AppUtils.wrapOn(
+      onStepPage: stepPage,
+      onJumpToPage: jumpToPage,
+      beforeChapterChange: beforeChapterChange,
+      onChapterChangeCommitted: onChapterChangeCommitted,
+      childBuilder: (contentNavigation) => AppUtils.wrapOn(
         !kIsWeb &&
                 (Platform.isAndroid || Platform.isIOS) &&
                 isPinchToZoomEnabled
-            ? (Widget child) => InteractiveViewer(maxScale: 5, child: child)
+            ? (child) => InteractiveViewer(maxScale: 5, child: child)
             : null,
-        ScrollablePositionedList.separated(
-          itemScrollController: scrollController,
-          itemPositionsListener: positionsListener,
-          initialScrollIndex: initialPage,
-          scrollDirection: scrollDirection,
-          reverse: reverse,
-          itemCount: actualPageCount == 0 ? 1 : actualPageCount,
-          minCacheExtent: scrollDirection == Axis.vertical
-              ? context.height * 2
-              : context.width * 2,
-          separatorBuilder: (BuildContext context, int index) =>
-              showSeparator ? const Gap(16) : const SizedBox.shrink(),
-          itemBuilder: (BuildContext context, int index) {
-            if (actualPageCount == 0 || index >= actualPageCount) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-
-            final Widget image = ServerImage(
-              key: ValueKey(
-                'continuous-page-${chapter.id}-$index-${chapterPages.pages[index]}',
-              ),
-              showReloadButton: true,
-              fit: scrollDirection == Axis.vertical
-                  ? BoxFit.fitWidth
-                  : BoxFit.fitHeight,
-              appendApiToUrl: false,
-              imageUrl: chapterPages.pages[index],
-              progressIndicatorBuilder: (_, __, downloadProgress) => Center(
-                child: CircularProgressIndicator(
-                  value: downloadProgress.progress,
-                ),
-              ),
-              wrapper: (Widget child) => SizedBox(
-                height: scrollDirection == Axis.vertical
-                    ? context.height * .7
-                    : null,
-                width: scrollDirection != Axis.vertical
-                    ? context.width * .7
-                    : null,
-                child: child,
-              ),
-            );
-
-            if (index == 0 || index == actualPageCount - 1) {
-              final bool reverseDirection =
-                  scrollDirection == Axis.horizontal && reverse;
-              final Widget separator = SizedBox(
-                width: scrollDirection != Axis.vertical
-                    ? context.width * .5
-                    : null,
-                child: ChapterSeparator(
-                  manga: manga,
-                  chapter: chapter,
-                  isPreviousChapterSeparator: (index == 0),
-                ),
-              );
-              return Flex(
-                direction: scrollDirection,
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: ((index == 0) != reverseDirection)
-                    ? [separator, image]
-                    : [image, separator],
-              );
-            } else {
-              return image;
-            }
-          },
-        ),
+        buildList(contentNavigation),
       ),
     );
   }
 
-  /// Immediate position tracking for UI display (navigation bar)
-  static void _updatePositionForDisplay(
-    List<ItemPosition> positions,
-    ValueNotifier<int> currentIndex,
-    int lastPageIndex,
-  ) {
-    if (positions.isEmpty) return;
-
-    for (final ItemPosition position in positions) {
-      if (position.index == lastPageIndex &&
-          position.itemLeadingEdge >= 0 &&
-          position.itemLeadingEdge <= 1 &&
-          position.itemTrailingEdge <= 1) {
-        currentIndex.value = lastPageIndex;
-        return;
-      }
-    }
-
-    // Find the item that's most visible for display purposes
-    ItemPosition? mostVisible;
-    double bestVisibleArea = 0.0;
-
-    for (final ItemPosition position in positions) {
-      final double visibleArea = _calculateVisibleArea(position);
-
-      if (visibleArea > bestVisibleArea &&
-          visibleArea > _ScrollConfig.minVisibleAreaThreshold) {
-        bestVisibleArea = visibleArea;
-        mostVisible = position;
-      }
-    }
-
-    if (mostVisible != null) {
-      // Update current index for display but don't trigger programmatic scrolling
-      currentIndex.value = mostVisible.index;
-    }
-  }
-
-  /// Calculates visible area of an item position more accurately
-  static double _calculateVisibleArea(ItemPosition position) {
-    final double leadingEdge = position.itemLeadingEdge.clamp(0.0, 1.0);
-    final double trailingEdge = position.itemTrailingEdge.clamp(0.0, 1.0);
-
-    // Calculate the portion that's actually visible in the viewport
-    final double visibleStart = leadingEdge < 0 ? 0.0 : leadingEdge;
-    final double visibleEnd = trailingEdge > 1 ? 1.0 : trailingEdge;
-
-    return (visibleEnd - visibleStart).clamp(0.0, 1.0);
-  }
-
-  /// Safe page jumping that respects user scroll state unless forced (for slider navigation)
-  static void _jumpToPageSafely(
-    ItemScrollController scrollController,
-    ValueNotifier<bool> isUserScrolling,
-    int index, {
-    bool forceNavigation = false,
+  @visibleForTesting
+  static int targetItemForStep({
+    required ReadingDirection direction,
+    required ReaderNavigationState state,
+    required int pageCount,
   }) {
-    // Allow forced navigation (from slider) or when user isn't scrolling
-    if (!forceNavigation && isUserScrolling.value) {
-      return; // Only block automatic navigation during user scrolling
-    }
-
-    // Perform the navigation
-    scrollController.jumpTo(index: index);
+    final lastPageIndex = pageCount - 1;
+    return switch (direction) {
+      ReadingDirection.forward => state.atStart
+          ? 1
+          : state.displayPageIndex < lastPageIndex
+              ? state.displayPageIndex + 2
+              : pageCount + 1,
+      ReadingDirection.backward => state.atEnd
+          ? pageCount
+          : state.displayPageIndex > 0
+              ? state.displayPageIndex
+              : 0,
+    };
   }
 
-  /// Safe navigation that only works when appropriate and doesn't interfere with scrolling
-  static void _handleNavigationSafely(
-      ItemScrollController scrollController,
-      ItemPositionsListener positionsListener,
-      ValueNotifier<bool> isUserScrolling,
-      bool isAnimationEnabled,
-      int lastPageIndex,
-      {required bool isNext}) {
-    // Don't interfere if user is actively scrolling
-    if (isUserScrolling.value) return;
-
-    final List<ItemPosition> positions =
-        positionsListener.itemPositions.value.toList();
-    if (positions.isEmpty) return;
-
-    // Find current position
-    ItemPosition? currentPosition;
-    for (final ItemPosition position in positions) {
-      final double visibleArea = _calculateVisibleArea(position);
-      if (visibleArea > _ScrollConfig.minVisibleAreaThreshold) {
-        currentPosition = position;
-        break;
-      }
-    }
-
-    if (currentPosition == null) return;
-
-    final int targetIndex;
-    final double alignment;
-
-    if (isNext) {
-      // Move to next item with minimal scroll
-      if (currentPosition.itemTrailingEdge > 0.8) {
-        targetIndex =
-            (currentPosition.index + 1).clamp(0, lastPageIndex).toInt();
-        alignment = 0.0;
-      } else {
-        targetIndex = currentPosition.index.clamp(0, lastPageIndex).toInt();
-        alignment = 0.0;
-      }
-    } else {
-      // Move to previous item with minimal scroll
-      if (currentPosition.itemLeadingEdge < 0.2) {
-        targetIndex =
-            (currentPosition.index - 1).clamp(0, lastPageIndex).toInt();
-        alignment = 0.0;
-      } else {
-        targetIndex = currentPosition.index.clamp(0, lastPageIndex).toInt();
-        alignment = 0.0;
-      }
-    }
-
-    // Use very gentle navigation
-    if (isAnimationEnabled) {
-      scrollController.scrollTo(
-        index: targetIndex,
-        duration:
-            const Duration(milliseconds: 200), // Faster, gentler animation
-        curve: Curves.easeOut, // Gentler curve
-        alignment: alignment,
-      );
-    } else {
-      scrollController.jumpTo(
-        index: targetIndex,
-        alignment: alignment,
+  @visibleForTesting
+  static ReaderNavigationState projectNavigationState({
+    required Iterable<ItemPosition> positions,
+    required int pageCount,
+    required ReaderNavigationState previous,
+  }) {
+    if (pageCount <= 0) {
+      return previous.copyWith(
+        displayPageIndex: 0,
+        atStart: true,
+        atEnd: true,
       );
     }
+
+    ItemPosition? startSentinel;
+    ItemPosition? endSentinel;
+    ItemPosition? mostVisiblePage;
+    var mostVisibleArea = -1.0;
+
+    for (final position in positions) {
+      if (position.index == 0) {
+        startSentinel = position;
+        continue;
+      }
+      if (position.index == pageCount + 1) {
+        endSentinel = position;
+        continue;
+      }
+      if (position.index < 1 || position.index > pageCount) continue;
+
+      final visibleArea = _visibleArea(position);
+      final shouldReplace = visibleArea > mostVisibleArea ||
+          (visibleArea == mostVisibleArea &&
+              position.index - 1 == previous.displayPageIndex);
+      if (shouldReplace) {
+        mostVisibleArea = visibleArea;
+        mostVisiblePage = position;
+      }
+    }
+
+    return previous.copyWith(
+      displayPageIndex:
+          mostVisiblePage?.index == null ? null : mostVisiblePage!.index - 1,
+      atStart: startSentinel != null &&
+          startSentinel.itemLeadingEdge >= -_positionEpsilon,
+      atEnd: endSentinel != null &&
+          endSentinel.itemTrailingEdge <= 1 + _positionEpsilon,
+    );
+  }
+
+  static double _visibleArea(ItemPosition position) {
+    final leading = position.itemLeadingEdge.clamp(0.0, 1.0);
+    final trailing = position.itemTrailingEdge.clamp(0.0, 1.0);
+    return (trailing - leading).clamp(0.0, 1.0);
   }
 }

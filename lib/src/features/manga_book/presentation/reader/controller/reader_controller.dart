@@ -24,3 +24,34 @@ FutureOr<ChapterDto?> chapter(
 Future<ChapterPagesDto?> chapterPages(Ref ref, {required int chapterId}) => ref
     .watch(mangaBookRepositoryProvider)
     .getChapterPages(chapterId: chapterId);
+
+@riverpod
+Future<List<ChapterDto>?> readerChapterList(
+  Ref ref, {
+  required int mangaId,
+}) =>
+    ref.watch(mangaBookRepositoryProvider).getChapterList(mangaId);
+
+@riverpod
+({ChapterDto? next, ChapterDto? previous})? readerChapterNeighbors(
+  Ref ref, {
+  required int mangaId,
+  required int chapterId,
+}) {
+  final chapters =
+      ref.watch(readerChapterListProvider(mangaId: mangaId)).valueOrNull;
+  if (chapters == null) return null;
+
+  final orderedChapters = [...chapters]
+    ..sort((first, second) => first.index.compareTo(second.index));
+  final currentIndex =
+      orderedChapters.indexWhere((chapter) => chapter.id == chapterId);
+  if (currentIndex == -1) return null;
+
+  return (
+    next: currentIndex < orderedChapters.length - 1
+        ? orderedChapters[currentIndex + 1]
+        : null,
+    previous: currentIndex > 0 ? orderedChapters[currentIndex - 1] : null,
+  );
+}

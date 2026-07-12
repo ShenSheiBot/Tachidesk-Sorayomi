@@ -26,8 +26,8 @@ class EdgeLayout extends StatelessWidget {
         Expanded(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onTap: onRightTap,
-            child: Container(color: rightColor),
+            onTap: onLeftTap,
+            child: Container(color: leftColor),
           ),
         ),
         Expanded(

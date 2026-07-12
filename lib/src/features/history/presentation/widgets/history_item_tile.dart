@@ -266,13 +266,13 @@ class HistoryItemTile extends ConsumerWidget {
         if (next is AsyncData<List<dynamic>?>) {
           // Now that the filtered list is ready, get the next chapter.
           final nextPrevChapterPair = ref.read(
-            getNextAndPreviousChaptersProvider(
+            getNextAndPreviousVisibleChaptersProvider(
               mangaId: item.mangaId,
               chapterId: item.id,
             ),
           );
           // If a next chapter exists, use it. Otherwise, fall back to the current chapter.
-          navigateAndCleanup(nextPrevChapterPair?.first?.id ?? item.id);
+          navigateAndCleanup(nextPrevChapterPair?.next?.id ?? item.id);
         } else if (next is AsyncError) {
           // On error, fall back to the current chapter.
           navigateAndCleanup(item.id);

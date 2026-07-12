@@ -55,6 +55,7 @@ class PageNumberSlider extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
+          textDirection: TextDirection.ltr,
           children: inverted ? sliderWidget.reversed.toList() : sliderWidget,
         ),
       ),
