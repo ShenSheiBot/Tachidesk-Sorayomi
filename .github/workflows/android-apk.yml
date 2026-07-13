@@ -96,8 +96,18 @@ jobs:
             echo
             echo "APKs are signed with the ShenSheiBot fork signing key and cannot update the official Suwayomi/Tachidesk-Sorayomi app in place."
           } > release-notes.md
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --title "Reader fixes ${version} Android APK" \
-            --notes-file release-notes.md
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Reader fixes ${version} Android APK" \
+              --notes-file release-notes.md
+            gh release upload "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "Reader fixes ${version} Android APK" \
+              --notes-file release-notes.md
+          fi
