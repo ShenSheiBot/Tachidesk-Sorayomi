@@ -33,6 +33,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
     required this.chapterPages,
     required this.initialOverlayVisible,
     required this.navigation,
+    required this.initialPage,
     required this.beforeChapterChange,
     required this.onChapterChangeCommitted,
     this.onPageChanged,
@@ -43,6 +44,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
   final ChapterDto chapter;
   final ValueSetter<int>? onPageChanged;
   final ResolvedReaderNavigation navigation;
+  final int initialPage;
   final AsyncCallback beforeChapterChange;
   final VoidCallback onChapterChangeCommitted;
   final bool showReaderLayoutAnimation;
@@ -53,12 +55,6 @@ class SinglePageReaderMode extends HookConsumerWidget {
     final cacheManager = useMemoized(() => DefaultCacheManager());
     final lastPageIndex =
         chapterPages.pages.isEmpty ? 0 : chapterPages.pages.length - 1;
-    final initialPage = chapter.isRead.ifNull()
-        ? 0
-        : chapter.lastPageRead
-            .getValueOnNullOrNegative()
-            .clamp(0, lastPageIndex)
-            .toInt();
     final scrollController = usePageController(
       initialPage: initialPage,
     );

@@ -6,6 +6,77 @@ import 'package:tachidesk_sorayomi/src/constants/enum.dart';
 import 'package:tachidesk_sorayomi/src/features/manga_book/presentation/reader/navigation/reader_navigation.dart';
 
 void main() {
+  group('resolveInitialReaderPage', () {
+    test('opens a previous chapter at its last page', () {
+      expect(
+        resolveInitialReaderPage(
+          pageCount: 24,
+          lastPageRead: 0,
+          isChapterRead: true,
+          openAtEnd: true,
+        ),
+        23,
+      );
+    });
+
+    test('restores saved progress during a normal entry', () {
+      expect(
+        resolveInitialReaderPage(
+          pageCount: 24,
+          lastPageRead: 7,
+          isChapterRead: false,
+          openAtEnd: false,
+        ),
+        7,
+      );
+    });
+
+    test('opens a completed chapter at the first page normally', () {
+      expect(
+        resolveInitialReaderPage(
+          pageCount: 24,
+          lastPageRead: 12,
+          isChapterRead: true,
+          openAtEnd: false,
+        ),
+        0,
+      );
+    });
+
+    test('clamps invalid saved progress to the chapter bounds', () {
+      expect(
+        resolveInitialReaderPage(
+          pageCount: 4,
+          lastPageRead: 99,
+          isChapterRead: false,
+          openAtEnd: false,
+        ),
+        3,
+      );
+      expect(
+        resolveInitialReaderPage(
+          pageCount: 4,
+          lastPageRead: -1,
+          isChapterRead: false,
+          openAtEnd: false,
+        ),
+        0,
+      );
+    });
+
+    test('keeps an empty chapter at page zero', () {
+      expect(
+        resolveInitialReaderPage(
+          pageCount: 0,
+          lastPageRead: 10,
+          isChapterRead: true,
+          openAtEnd: true,
+        ),
+        0,
+      );
+    });
+  });
+
   group('ResolvedReaderNavigation', () {
     test('resolveMode uses each explicit manga reader mode', () {
       for (final mode in ReaderMode.values.where(
@@ -96,6 +167,7 @@ void main() {
           forwardTransition.fromNegativeDirection,
           expectation.forwardFromNegativeDirection,
         );
+        expect(forwardTransition.openAtEnd, isFalse);
 
         final backwardTransition = navigation.chapterTransition(
           ReadingDirection.backward,
@@ -112,6 +184,7 @@ void main() {
           backwardTransition.fromNegativeDirection,
           expectation.backwardFromNegativeDirection,
         );
+        expect(backwardTransition.openAtEnd, isTrue);
 
         final offAxisDirections = expectation.axis == Axis.horizontal
             ? const [AxisDirection.up, AxisDirection.down]
@@ -140,7 +213,10 @@ void main() {
       };
 
       for (final entry in expectations.entries) {
-        final transition = ReaderChapterTransition(entryFrom: entry.key);
+        final transition = ReaderChapterTransition(
+          entryFrom: entry.key,
+          openAtEnd: false,
+        );
         expect(transition.isVertical, entry.value.isVertical);
         expect(
           transition.fromNegativeDirection,

@@ -18,6 +18,18 @@ enum ReaderPageStepResult { moved, atBoundary, unavailable }
 
 enum ReaderBoundaryBehavior { stop, changeChapter }
 
+int resolveInitialReaderPage({
+  required int pageCount,
+  required int lastPageRead,
+  required bool isChapterRead,
+  required bool openAtEnd,
+}) {
+  if (pageCount <= 0) return 0;
+  if (openAtEnd) return pageCount - 1;
+  if (isChapterRead) return 0;
+  return lastPageRead.clamp(0, pageCount - 1).toInt();
+}
+
 sealed class ReaderCommand {
   const ReaderCommand();
 }
@@ -314,7 +326,10 @@ final class ResolvedReaderNavigation {
     final entryFrom = direction == ReadingDirection.forward
         ? forwardControlDirection
         : backwardControlDirection;
-    return ReaderChapterTransition(entryFrom: entryFrom);
+    return ReaderChapterTransition(
+      entryFrom: entryFrom,
+      openAtEnd: direction == ReadingDirection.backward,
+    );
   }
 
   static AxisDirection _opposite(AxisDirection direction) =>
@@ -327,9 +342,13 @@ final class ResolvedReaderNavigation {
 }
 
 final class ReaderChapterTransition {
-  const ReaderChapterTransition({required this.entryFrom});
+  const ReaderChapterTransition({
+    required this.entryFrom,
+    required this.openAtEnd,
+  });
 
   final AxisDirection entryFrom;
+  final bool openAtEnd;
 
   bool get isVertical =>
       entryFrom == AxisDirection.up || entryFrom == AxisDirection.down;

@@ -33,11 +33,13 @@ class ReaderScreen extends HookConsumerWidget {
     required this.mangaId,
     required this.chapterId,
     this.useInitialReaderOverlay = true,
+    this.openAtEnd = false,
     this.showReaderLayoutAnimation = false,
   });
   final int mangaId;
   final int chapterId;
   final bool useInitialReaderOverlay;
+  final bool openAtEnd;
   final bool showReaderLayoutAnimation;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -223,6 +225,13 @@ class ReaderScreen extends HookConsumerWidget {
                         final navigation = ResolvedReaderNavigation.fromMode(
                           resolvedReaderMode,
                         );
+                        final initialPage = resolveInitialReaderPage(
+                          pageCount: chapterPagesData.pages.length,
+                          lastPageRead: chapterData.lastPageRead
+                              .getValueOnNullOrNegative(),
+                          isChapterRead: chapterData.isRead.ifNull(),
+                          openAtEnd: openAtEnd,
+                        );
                         final reader = switch (resolvedReaderMode) {
                           ReaderMode.singleVertical => SinglePageReaderMode(
                               chapter: chapterData,
@@ -230,6 +239,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
@@ -244,6 +254,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
@@ -258,6 +269,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
@@ -272,6 +284,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
@@ -286,6 +299,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
@@ -297,6 +311,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
@@ -311,6 +326,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
@@ -324,6 +340,7 @@ class ReaderScreen extends HookConsumerWidget {
                               onPageChanged: onPageChanged,
                               initialOverlayVisible: initialOverlayVisible,
                               navigation: navigation,
+                              initialPage: initialPage,
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,

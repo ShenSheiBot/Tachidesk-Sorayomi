@@ -212,6 +212,7 @@ class ReaderWrapper extends HookConsumerWidget {
         transVertical: transition.isVertical,
         toPrev: transition.fromNegativeDirection,
         fromReaderChapterNavigation: true,
+        openAtEnd: transition.openAtEnd,
       ).pushReplacement(context);
       return true;
     }, [

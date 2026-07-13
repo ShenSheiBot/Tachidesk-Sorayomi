@@ -33,6 +33,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
     required this.chapterPages,
     required this.initialOverlayVisible,
     required this.navigation,
+    required this.initialPage,
     required this.beforeChapterChange,
     required this.onChapterChangeCommitted,
     this.showSeparator = false,
@@ -47,6 +48,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
   final bool showSeparator;
   final ValueSetter<int>? onPageChanged;
   final ResolvedReaderNavigation navigation;
+  final int initialPage;
   final AsyncCallback beforeChapterChange;
   final VoidCallback onChapterChangeCommitted;
   final bool showReaderLayoutAnimation;
@@ -59,12 +61,6 @@ class ContinuousReaderMode extends HookConsumerWidget {
     final positionsListener = useMemoized(ItemPositionsListener.create);
     final actualPageCount = chapterPages.pages.length;
     final lastPageIndex = actualPageCount == 0 ? 0 : actualPageCount - 1;
-    final initialPage = chapter.isRead.ifNull()
-        ? 0
-        : chapter.lastPageRead
-            .getValueOnNullOrNegative()
-            .clamp(0, lastPageIndex)
-            .toInt();
     final navigationState = useState(
       ReaderNavigationState(
         displayPageIndex: initialPage,

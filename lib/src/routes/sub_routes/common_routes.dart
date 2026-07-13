@@ -25,6 +25,7 @@ class ReaderRoute extends GoRouteData {
     this.transVertical,
     this.toPrev,
     this.fromReaderChapterNavigation = false,
+    this.openAtEnd = false,
     this.showReaderLayoutAnimation = false,
   });
   final int mangaId;
@@ -32,6 +33,7 @@ class ReaderRoute extends GoRouteData {
   final bool? transVertical;
   final bool? toPrev;
   final bool fromReaderChapterNavigation;
+  final bool openAtEnd;
   final bool showReaderLayoutAnimation;
 
   static final $parentNavigatorKey = _quickOpenNavigatorKey;
@@ -44,6 +46,7 @@ class ReaderRoute extends GoRouteData {
         mangaId: mangaId,
         chapterId: chapterId,
         useInitialReaderOverlay: !fromReaderChapterNavigation,
+        openAtEnd: openAtEnd,
         showReaderLayoutAnimation: showReaderLayoutAnimation,
       ),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
