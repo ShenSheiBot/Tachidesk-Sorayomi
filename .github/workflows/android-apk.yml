@@ -9,6 +9,8 @@ on:
       - "reader-fixes-*"
     paths-ignore:
       - .github/workflows/android-apk.yml
+      - .github/workflows/publish.yml
+      - .github/workflows/web.yml
 
 jobs:
   build:
