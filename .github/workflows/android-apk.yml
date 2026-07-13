@@ -15,7 +15,7 @@ jobs:
     name: Build Android APKs
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -66,48 +66,3 @@ jobs:
         with:
           name: tachidesk-sorayomi-android-apks
           path: dist/*
-
-      - name: Verify ShenSheiBot release token
-        if: startsWith(github.ref, 'refs/tags/reader-fixes-')
-        env:
-          RELEASE_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
-        run: test -n "$RELEASE_TOKEN"
-
-      - name: Publish Android release
-        if: startsWith(github.ref, 'refs/tags/reader-fixes-')
-        env:
-          GH_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
-        run: |
-          version="$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)"
-          previous_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
-          {
-            echo "Unofficial Android APK build from ShenSheiBot/Tachidesk-Sorayomi."
-            echo
-            echo "Version: ${version}"
-            echo "Commit: ${GITHUB_SHA}"
-            echo "GitHub Actions run: ${GITHUB_RUN_ID}"
-            echo
-            echo "Changes:"
-            if [ -n "$previous_tag" ]; then
-              git log --pretty='- %s' "${previous_tag}..HEAD"
-            else
-              git log -1 --pretty='- %s'
-            fi
-            echo
-            echo "APKs are signed with the ShenSheiBot fork signing key and cannot update the official Suwayomi/Tachidesk-Sorayomi app in place."
-          } > release-notes.md
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Reader fixes ${version} Android APK" \
-              --notes-file release-notes.md
-            gh release upload "$GITHUB_REF_NAME" dist/* \
-              --repo "$GITHUB_REPOSITORY" \
-              --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" dist/* \
-              --repo "$GITHUB_REPOSITORY" \
-              --verify-tag \
-              --title "Reader fixes ${version} Android APK" \
-              --notes-file release-notes.md
-          fi
