@@ -23,6 +23,8 @@ import '../../../../domain/chapter/chapter_model.dart';
 import '../../../../domain/chapter_page/chapter_page_model.dart';
 import '../../../../domain/manga/manga_model.dart';
 import '../../navigation/reader_navigation.dart';
+import '../reader_interactive_viewer.dart';
+import '../reader_page_scroll_listener.dart';
 import '../reader_wrapper.dart';
 
 class SinglePageReaderMode extends HookConsumerWidget {
@@ -183,7 +185,8 @@ class SinglePageReaderMode extends HookConsumerWidget {
       beforeChapterChange: beforeChapterChange,
       onChapterChangeCommitted: onChapterChangeCommitted,
       showReaderLayoutAnimation: showReaderLayoutAnimation,
-      childBuilder: (_) => NotificationListener<ScrollNotification>(
+      childBuilder: (contentNavigation) =>
+          NotificationListener<ScrollNotification>(
         onNotification: trackUserScrolling,
         child: Directionality(
           textDirection: TextDirection.ltr,
@@ -231,11 +234,14 @@ class SinglePageReaderMode extends HookConsumerWidget {
                   value: downloadProgress.progress,
                 ),
               );
-              return AppUtils.wrapOn(
-                !kIsWeb && (Platform.isAndroid || Platform.isIOS)
-                    ? (child) => InteractiveViewer(maxScale: 5, child: child)
-                    : null,
-                image,
+              return ReaderPageScrollListener(
+                onCommand: contentNavigation.onCommand,
+                child: AppUtils.wrapOn(
+                  !kIsWeb && (Platform.isAndroid || Platform.isIOS)
+                      ? (child) => ReaderInteractiveViewer(child: child)
+                      : null,
+                  image,
+                ),
               );
             },
             itemCount:

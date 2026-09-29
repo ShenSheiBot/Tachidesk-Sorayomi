@@ -4,14 +4,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../../../constants/app_constants.dart';
 import '../../../../../../constants/db_keys.dart';
 import '../../../../../../utils/extensions/custom_extensions.dart';
 import '../../../../../../utils/mixin/shared_preferences_client_mixin.dart';
@@ -46,7 +42,7 @@ class ReaderPaddingSlider extends ConsumerWidget {
   }
 }
 
-class AsyncReaderPaddingSlider extends HookConsumerWidget {
+class AsyncReaderPaddingSlider extends ConsumerWidget {
   const AsyncReaderPaddingSlider({
     super.key,
     required this.onChanged,
@@ -58,29 +54,15 @@ class AsyncReaderPaddingSlider extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final debounce = useRef<Timer?>(null);
-
-    final onDebounceChanged = useCallback<ValueSetter<double>>(
-      (double paddingValue) async {
-        readerPadding.value = (paddingValue);
-        final finalDebounce = debounce.value;
-        if ((finalDebounce?.isActive).ifNull()) {
-          finalDebounce?.cancel();
-        }
-        debounce.value = Timer(
-          kDebounceDuration,
-          () => onChanged(paddingValue),
-        );
-        return;
-      },
-      [],
-    );
     return SliderSettingTile(
       icon: Icons.width_wide_rounded,
       title: context.l10n.readerPadding,
       value: readerPadding.value,
       getSliderLabel: (val) => (val * 2.5).toStringAsFixed(2),
-      onChanged: onDebounceChanged,
+      // Preview continuously, persist once on release rather than from a timer
+      // that can outlive the chapter which owns this control.
+      onChanged: (value) => readerPadding.value = value,
+      onChangeEnd: onChanged,
       defaultValue: DBKeys.readerPadding.initial,
       min: 0,
       max: 0.4,

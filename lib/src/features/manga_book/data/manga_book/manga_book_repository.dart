@@ -170,7 +170,7 @@ class MangaBookRepository {
               meta: Input$MangaMetaTypeInput(
                 key: key,
                 mangaId: mangaId,
-                value: value,
+                value: value.toString(),
               ),
             ),
           ),

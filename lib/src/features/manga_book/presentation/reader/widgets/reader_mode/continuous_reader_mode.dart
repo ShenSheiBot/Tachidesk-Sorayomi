@@ -9,7 +9,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -23,6 +22,7 @@ import '../../../../domain/chapter_page/chapter_page_model.dart';
 import '../../../../domain/manga/manga_model.dart';
 import '../../navigation/reader_navigation.dart';
 import '../chapter_separator.dart';
+import '../reader_interactive_viewer.dart';
 import '../reader_wrapper.dart';
 
 class ContinuousReaderMode extends HookConsumerWidget {
@@ -36,7 +36,6 @@ class ContinuousReaderMode extends HookConsumerWidget {
     required this.initialPage,
     required this.beforeChapterChange,
     required this.onChapterChangeCommitted,
-    this.showSeparator = false,
     this.onPageChanged,
     this.showReaderLayoutAnimation = false,
   });
@@ -45,7 +44,6 @@ class ContinuousReaderMode extends HookConsumerWidget {
 
   final MangaDto manga;
   final ChapterDto chapter;
-  final bool showSeparator;
   final ValueSetter<int>? onPageChanged;
   final ResolvedReaderNavigation navigation;
   final int initialPage;
@@ -181,7 +179,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
           onNotification: trackUserScrolling,
           child: Directionality(
             textDirection: TextDirection.ltr,
-            child: ScrollablePositionedList.separated(
+            child: ScrollablePositionedList.builder(
               itemScrollController: scrollController,
               itemPositionsListener: positionsListener,
               initialScrollIndex: actualPageCount == 0 ? 0 : initialPage + 1,
@@ -191,8 +189,6 @@ class ContinuousReaderMode extends HookConsumerWidget {
               minCacheExtent: navigation.axis == Axis.vertical
                   ? context.height * 2
                   : context.width * 2,
-              separatorBuilder: (_, __) =>
-                  showSeparator ? const Gap(16) : const SizedBox.shrink(),
               itemBuilder: (context, itemIndex) {
                 if (actualPageCount == 0) {
                   return const Center(child: CircularProgressIndicator());
@@ -267,7 +263,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
         !kIsWeb &&
                 (Platform.isAndroid || Platform.isIOS) &&
                 isPinchToZoomEnabled
-            ? (child) => InteractiveViewer(maxScale: 5, child: child)
+            ? (child) => ReaderInteractiveViewer(child: child)
             : null,
         buildList(contentNavigation),
       ),

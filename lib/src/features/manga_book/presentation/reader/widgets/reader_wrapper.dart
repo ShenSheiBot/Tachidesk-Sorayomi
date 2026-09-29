@@ -44,6 +44,7 @@ import '../navigation/reader_keyboard_shortcuts.dart';
 import '../navigation/reader_navigation.dart';
 import 'directional_swipe_gesture_handler.dart';
 import 'reader_navigation_layout/reader_navigation_layout.dart';
+import 'reader_page_scroll_listener.dart';
 import 'reader_progress_controls.dart';
 
 typedef ReaderContentBuilder = Widget Function(
@@ -120,6 +121,7 @@ class ReaderWrapper extends HookConsumerWidget {
             DBKeys.readerMagnifierSize.initial;
 
     final visibility = useState(initialOverlayVisible);
+    final paddingSave = useRef<Future<void>>(Future.value());
     final mangaReaderPadding =
         useState(manga.metaData.readerPadding ?? localMangaReaderPadding);
     final mangaReaderMagnifierSize = useState(
@@ -202,6 +204,9 @@ class ReaderWrapper extends HookConsumerWidget {
           : nextPrevChapterPair?.previous;
       if (targetChapter == null) return false;
 
+      // A new chapter must read manga metadata after the last slider commit.
+      await paddingSave.value;
+      if (!context.mounted) return false;
       await beforeChapterChange();
       if (!context.mounted) return false;
       onChapterChangeCommitted();
@@ -217,6 +222,7 @@ class ReaderWrapper extends HookConsumerWidget {
       return true;
     }, [
       nextPrevChapterPair,
+      paddingSave,
       manga.id,
       navigation,
       beforeChapterChange,
@@ -342,14 +348,24 @@ class ReaderWrapper extends HookConsumerWidget {
               AsyncReaderPaddingSlider(
                 readerPadding: mangaReaderPadding,
                 onChanged: (value) {
-                  AsyncValue.guard(
-                    () => ref.read(mangaBookRepositoryProvider).patchMangaMeta(
-                          mangaId: manga.id,
-                          key: MangaMetaKeys.readerPadding.key,
-                          value: value,
-                        ),
-                  );
-                  ref.invalidate(mangaWithIdProvider(mangaId: manga.id));
+                  final repository = ref.read(mangaBookRepositoryProvider);
+                  paddingSave.value = paddingSave.value.then((_) async {
+                    final result = await AsyncValue.guard(() async {
+                      await repository.patchMangaMeta(
+                        mangaId: manga.id,
+                        key: MangaMetaKeys.readerPadding.key,
+                        value: value,
+                      );
+                      if (!context.mounted) return;
+                      final mangaProvider =
+                          mangaWithIdProvider(mangaId: manga.id);
+                      ref.invalidate(mangaProvider);
+                      await ref.read(mangaProvider.future);
+                    });
+                    if (context.mounted && result.hasError) {
+                      result.showToastOnError(ref.read(toastProvider));
+                    }
+                  });
                 },
               ),
               AsyncReaderMagnifierSizeSlider(
@@ -569,7 +585,7 @@ class ReaderView extends HookWidget {
       child: content,
     );
 
-    return Stack(
+    final view = Stack(
       children: [
         content,
         ReaderNavigationLayoutWidget(
@@ -602,5 +618,17 @@ class ReaderView extends HookWidget {
           ),
       ],
     );
+    // Covers tap-navigation overlays and padding. The page's inner listener
+    // takes priority over PageView's pixel scrolling when content is hit.
+    return switch (navigation.mode) {
+      ReaderMode.singleHorizontalLTR ||
+      ReaderMode.singleHorizontalRTL ||
+      ReaderMode.singleVertical =>
+        ReaderPageScrollListener(
+          onCommand: onCommand,
+          child: view,
+        ),
+      _ => view,
+    };
   }
 }

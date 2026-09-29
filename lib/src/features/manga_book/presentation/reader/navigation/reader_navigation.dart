@@ -106,8 +106,6 @@ final class ReaderNavigationBindings {
 }
 
 final class ReaderNavigationCoordinator {
-  static const _maxQueuedPageCommands = 8;
-
   bool _isExecuting = false;
   bool _chapterTransitionStarted = false;
   bool _isDisposed = false;
@@ -156,9 +154,6 @@ final class ReaderNavigationCoordinator {
       return;
     }
 
-    while (_pending.length >= _maxQueuedPageCommands) {
-      _pending.removeFirst();
-    }
     _pending.add(queued);
   }
 

@@ -14,6 +14,7 @@ class SliderSettingTile<T> extends StatelessWidget {
     required this.value,
     required this.defaultValue,
     required this.onChanged,
+    this.onChangeEnd,
     required this.min,
     required this.max,
     required this.getSliderLabel,
@@ -22,6 +23,7 @@ class SliderSettingTile<T> extends StatelessWidget {
   final IconData icon;
   final double value;
   final ValueSetter<double> onChanged;
+  final ValueSetter<double>? onChangeEnd;
   final double min;
   final double defaultValue;
   final double max;
@@ -35,7 +37,10 @@ class SliderSettingTile<T> extends StatelessWidget {
       leading: Icon(icon),
       title: Text(title),
       trailing: IconButton(
-        onPressed: () => onChanged(defaultValue),
+        onPressed: () {
+          onChanged(defaultValue);
+          onChangeEnd?.call(defaultValue);
+        },
         icon: const Icon(Icons.refresh_rounded),
       ),
       subtitle: Row(
@@ -47,6 +52,7 @@ class SliderSettingTile<T> extends StatelessWidget {
               min: min,
               max: max,
               onChanged: (value) => onChanged(value),
+              onChangeEnd: onChangeEnd,
             ),
           ),
           Text(label),

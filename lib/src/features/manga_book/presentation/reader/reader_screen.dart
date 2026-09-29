@@ -315,7 +315,6 @@ class ReaderScreen extends HookConsumerWidget {
                               beforeChapterChange: flushReadingProgress,
                               onChapterChangeCommitted:
                                   markChapterChangeCommitted,
-                              showSeparator: true,
                               showReaderLayoutAnimation:
                                   showReaderLayoutAnimation,
                               chapterPages: chapterPagesData,
