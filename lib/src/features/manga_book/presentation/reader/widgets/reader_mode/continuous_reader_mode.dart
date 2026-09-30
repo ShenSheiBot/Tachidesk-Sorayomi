@@ -222,6 +222,11 @@ class ContinuousReaderMode extends HookConsumerWidget {
                     '${chapterPages.pages[pageIndex]}',
                   ),
                   showReloadButton: true,
+                  // A fading placeholder still takes up space in the image
+                  // stack. Drop it as soon as a vertical page is decoded.
+                  fadeOutDuration: navigation.axis == Axis.vertical
+                      ? Duration.zero
+                      : const Duration(milliseconds: 1000),
                   fit: navigation.axis == Axis.vertical
                       ? BoxFit.fitWidth
                       : BoxFit.fitHeight,

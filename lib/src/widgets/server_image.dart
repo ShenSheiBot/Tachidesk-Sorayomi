@@ -33,6 +33,7 @@ class ServerImage extends HookConsumerWidget {
     this.progressIndicatorBuilder,
     this.wrapper,
     this.showReloadButton = false,
+    this.fadeOutDuration = const Duration(milliseconds: 1000),
   });
 
   final String imageUrl;
@@ -43,6 +44,7 @@ class ServerImage extends HookConsumerWidget {
       progressIndicatorBuilder;
   final Widget Function(Widget child)? wrapper;
   final bool showReloadButton;
+  final Duration fadeOutDuration;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -125,6 +127,7 @@ class ServerImage extends HookConsumerWidget {
       httpHeaders: httpHeaders,
       width: size?.width,
       fit: fit ?? BoxFit.cover,
+      fadeOutDuration: fadeOutDuration,
       imageRenderMethodForWeb: renderMethod,
       progressIndicatorBuilder: finalProgressIndicatorBuilder,
       errorWidget: errorWidget,
