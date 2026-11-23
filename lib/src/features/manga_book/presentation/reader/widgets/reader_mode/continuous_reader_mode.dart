@@ -90,7 +90,7 @@ class ContinuousReaderMode extends HookConsumerWidget {
     }, [navigationState.value.displayPageIndex]);
 
     final isAnimationEnabled =
-        ref.read(readerScrollAnimationProvider).ifNull(true);
+        ref.watch(readerScrollAnimationProvider) != ReaderPageAnimation.none;
     final isPinchToZoomEnabled = ref.read(pinchToZoomProvider).ifNull(true);
 
     Future<void> scrollToItem(int itemIndex) async {

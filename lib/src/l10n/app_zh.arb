@@ -767,6 +767,9 @@
   "@chapterSortUploadDate": {
     "description": "Radio button text for sort by Upload Date"
   },
+  "readerPageAnimationNone": "无",
+  "readerPageAnimationSlide": "滑动",
+  "readerPageAnimationIReader": "掌阅水波纹",
   "readerScrollAnimation": "滚动动画",
   "@readerScrollAnimation": {
     "description": "Switch title to Disable scroll animation in reader screen"

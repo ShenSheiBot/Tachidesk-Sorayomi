@@ -102,8 +102,22 @@ class SinglePageReaderMode extends HookConsumerWidget {
       }
       return null;
     }, [currentIndex.value, chapterPages.pages.length]);
-    final isAnimationEnabled =
-        ref.read(readerScrollAnimationProvider).ifNull(true);
+    final animation = ref.watch(readerScrollAnimationProvider);
+
+    Future<void> jumpTo(int targetPage) async {
+      final currentPage = scrollController.page?.round() ?? currentIndex.value;
+      if (targetPage == currentPage) return;
+      if (animation == ReaderPageAnimation.iReaderRipple &&
+          navigation.axis == Axis.horizontal) {
+        await prepareIReaderRipple(
+          forward: targetPage > currentPage,
+          rightToLeft: navigation.pageViewReverse,
+        );
+        if (!context.mounted || !scrollController.hasClients) return;
+      }
+      scrollController.jumpToPage(targetPage);
+      await WidgetsBinding.instance.endOfFrame;
+    }
 
     final stepPage = useCallback<ReaderPageStep>((direction) async {
       if (chapterPages.pages.isEmpty || !scrollController.hasClients) {
@@ -119,15 +133,14 @@ class SinglePageReaderMode extends HookConsumerWidget {
 
       navigationState.value = navigationState.value.copyWith(isBusy: true);
       try {
-        if (isAnimationEnabled) {
+        if (animation == ReaderPageAnimation.slide) {
           await scrollController.animateToPage(
             targetPage,
             duration: kDuration,
             curve: kCurve,
           );
         } else {
-          scrollController.jumpToPage(targetPage);
-          await WidgetsBinding.instance.endOfFrame;
+          await jumpTo(targetPage);
         }
       } finally {
         if (context.mounted) {
@@ -138,7 +151,8 @@ class SinglePageReaderMode extends HookConsumerWidget {
     }, [
       chapterPages.pages.length,
       currentIndex.value,
-      isAnimationEnabled,
+      animation,
+      navigation,
       lastPageIndex,
       navigationState,
       scrollController,
@@ -148,8 +162,7 @@ class SinglePageReaderMode extends HookConsumerWidget {
       if (!scrollController.hasClients || chapterPages.pages.isEmpty) return;
       navigationState.value = navigationState.value.copyWith(isBusy: true);
       try {
-        scrollController.jumpToPage(index.clamp(0, lastPageIndex));
-        await WidgetsBinding.instance.endOfFrame;
+        await jumpTo(index.clamp(0, lastPageIndex));
       } finally {
         if (context.mounted) {
           navigationState.value = navigationState.value.copyWith(isBusy: false);
@@ -157,6 +170,8 @@ class SinglePageReaderMode extends HookConsumerWidget {
       }
     }, [
       chapterPages.pages.length,
+      animation,
+      navigation,
       lastPageIndex,
       navigationState,
       scrollController,

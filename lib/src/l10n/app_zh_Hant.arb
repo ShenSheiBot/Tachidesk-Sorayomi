@@ -809,6 +809,9 @@
   "@noCategoriesFound": {
     "description": "Hint text to add new Category when category list is empty"
   },
+  "readerPageAnimationNone": "無",
+  "readerPageAnimationSlide": "滑動",
+  "readerPageAnimationIReader": "掌閱水波紋",
   "readerScrollAnimation": "滑動動畫",
   "@readerScrollAnimation": {
     "description": "Switch title to Disable scroll animation in reader screen"
