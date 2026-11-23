@@ -34,8 +34,6 @@ class HistoryRepository {
   }) async {
     // Build filter for chapters with actual reading progress
     final filter = Input$ChapterFilterInput(
-      // Only get chapters from library manga
-      inLibrary: Input$BooleanFilterInput(equalTo: true),
       // Only get chapters that have been read (lastReadAt is not null/empty)
       lastReadAt: Input$LongFilterInput(
         isNull: false,

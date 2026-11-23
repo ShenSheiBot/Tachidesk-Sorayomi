@@ -76,6 +76,16 @@ class MangaBookRepository {
           ))
           .getData((data) => data.manga);
 
+  Future<void> fetchMangaDetails({required int mangaId}) => client
+      .mutate$FetchMangaDetails(
+        Options$Mutation$FetchMangaDetails(
+          variables: Variables$Mutation$FetchMangaDetails(
+            input: Input$FetchMangaInput(id: mangaId),
+          ),
+        ),
+      )
+      .getData((data) => data.fetchManga?.manga.id);
+
   Future<List<CategoryDto>?> getMangaCategoryList({
     required int mangaId,
   }) async =>

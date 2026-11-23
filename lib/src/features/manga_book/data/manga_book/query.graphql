@@ -10,6 +10,14 @@ query GetManga($id: Int!) {
   }
 }
 
+mutation FetchMangaDetails($input: FetchMangaInput!) {
+  fetchManga(input: $input) {
+    manga {
+      id
+    }
+  }
+}
+
 mutation UpdateManga($input: UpdateMangaInput!) {
   updateManga(input: $input) {
     manga {

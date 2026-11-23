@@ -21,6 +21,7 @@ import '../../../../widgets/emoticons.dart';
 import '../../../library/presentation/category/controller/edit_category_controller.dart';
 import '../../../library/presentation/library/controller/library_controller.dart';
 import '../../../migration/domain/migration_models.dart';
+import '../../data/manga_book/manga_book_repository.dart';
 import '../../domain/chapter/chapter_model.dart';
 import '../../widgets/chapter_actions/multi_chapters_actions_bottom_app_bar.dart';
 import 'controller/manga_details_controller.dart';
@@ -51,8 +52,20 @@ class MangaDetailsScreen extends HookConsumerWidget {
 
     // Refresh manga
     final mangaRefresh = useCallback(([bool onlineFetch = false]) async {
+      final result = await AsyncValue.guard(() async {
+        if (onlineFetch) {
+          await ref
+              .read(mangaBookRepositoryProvider)
+              .fetchMangaDetails(mangaId: mangaId);
+        }
+      });
+      if (!context.mounted) return false;
       await ref.read(mangaProvider.notifier).refresh();
+      if (!context.mounted) return false;
+      result.showToastOnError(ref.read(toastProvider));
+
       ref.invalidate(categoryControllerProvider);
+      return !result.hasError;
     }, [mangaProvider]);
 
     // Refresh chapter list
@@ -68,10 +81,12 @@ class MangaDetailsScreen extends HookConsumerWidget {
               withMicrotask: true,
             );
       }
-      await mangaRefresh(onlineFetch);
+      final mangaFetched = await mangaRefresh(onlineFetch);
+      if (!context.mounted) return;
       await chapterListRefresh(onlineFetch);
       if (context.mounted && onlineFetch) {
-        if (manga.hasError) {
+        if (!mangaFetched) return;
+        if (ref.read(mangaProvider).hasError) {
           ref.read(toastProvider)?.showError(
                 context.l10n.errorSomethingWentWrong,
               );
@@ -85,9 +100,11 @@ class MangaDetailsScreen extends HookConsumerWidget {
     }, [context, mangaRefresh, chapterListRefresh]);
 
     useEffect(() {
-      if (filteredChapterList.isNotLoading && manga.isNotLoading) refresh();
-      return;
-    }, []);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) mangaRefresh(true);
+      });
+      return null;
+    }, [mangaRefresh]);
 
     // Migration function
     void startMigration(BuildContext context, int mangaId, dynamic manga) {
