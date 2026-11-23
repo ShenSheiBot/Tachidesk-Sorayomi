@@ -107,9 +107,10 @@ class SinglePageReaderMode extends HookConsumerWidget {
     Future<void> jumpTo(int targetPage) async {
       final currentPage = scrollController.page?.round() ?? currentIndex.value;
       if (targetPage == currentPage) return;
+      String? report;
       final speed = animation.rippleSpeed;
       if (speed != null && navigation.axis == Axis.horizontal) {
-        await prepareIReaderRipple(
+        report = await prepareIReaderRipple(
           forward: targetPage > currentPage,
           rightToLeft: navigation.pageViewReverse,
           speed: speed,
@@ -118,6 +119,26 @@ class SinglePageReaderMode extends HookConsumerWidget {
       }
       scrollController.jumpToPage(targetPage);
       await WidgetsBinding.instance.endOfFrame;
+      if (report != null) {
+        // Leave the new page on screen before presenting the diagnostic.
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (!context.mounted || ModalRoute.of(context)?.isCurrent == false) {
+          return;
+        }
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('iReader ripple diagnostic'),
+            content: SingleChildScrollView(child: SelectableText(report!)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(MaterialLocalizations.of(context).closeButtonLabel),
+              ),
+            ],
+          ),
+        );
+      }
     }
 
     final stepPage = useCallback<ReaderPageStep>((direction) async {

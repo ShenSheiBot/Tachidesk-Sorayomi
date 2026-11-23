@@ -34,22 +34,23 @@ const _rippleChannel = MethodChannel('sorayomi/ireader_page_turn');
 bool get _isAndroid =>
     !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-Future<void> prepareIReaderRipple({
+Future<String> prepareIReaderRipple({
   required bool forward,
   required bool rightToLeft,
   required int speed,
 }) async {
-  if (!_isAndroid) return;
+  if (!_isAndroid) return 'Android bridge unavailable';
   try {
-    await _rippleChannel.invokeMethod<void>('prepare', {
-      'forward': forward,
-      'rightToLeft': rightToLeft,
-      'speed': speed,
-    });
+    return await _rippleChannel.invokeMethod<String>('prepare', {
+          'forward': forward,
+          'rightToLeft': rightToLeft,
+          'speed': speed,
+        }) ??
+        'Android bridge returned no report';
   } on PlatformException catch (error) {
-    debugPrint('iReader ripple unavailable: $error');
+    return error.toString();
   } on MissingPluginException {
-    // The ordinary page jump is also available without the vendor bridge.
+    return 'Android bridge not registered';
   }
 }
 
