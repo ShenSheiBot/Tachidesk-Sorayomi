@@ -10,15 +10,25 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../../../utils/extensions/custom_extensions.dart';
+import '../../../../../../constants/db_keys.dart';
 import '../../../../../../global_providers/global_providers.dart';
+import '../../../../../../utils/extensions/custom_extensions.dart';
 
 part 'reader_scroll_animation_tile.g.dart';
 
-enum ReaderPageAnimation { none, slide, iReaderRipple }
+enum ReaderPageAnimation {
+  none,
+  slide,
+  iReaderRippleSlow(128),
+  iReaderRipple(64),
+  iReaderRippleFast(0);
 
-const _animationKey = 'scrollAnimation';
-const _rippleValue = 'iReaderRipple';
+  const ReaderPageAnimation([this.rippleSpeed]);
+
+  final int? rippleSpeed;
+}
+
+final _animationKey = DBKeys.scrollAnimation.name;
 const _rippleChannel = MethodChannel('sorayomi/ireader_page_turn');
 
 bool get _isAndroid =>
@@ -27,12 +37,14 @@ bool get _isAndroid =>
 Future<void> prepareIReaderRipple({
   required bool forward,
   required bool rightToLeft,
+  required int speed,
 }) async {
   if (!_isAndroid) return;
   try {
     await _rippleChannel.invokeMethod<void>('prepare', {
       'forward': forward,
       'rightToLeft': rightToLeft,
+      'speed': speed,
     });
   } on PlatformException catch (error) {
     debugPrint('iReader ripple unavailable: $error');
@@ -48,15 +60,18 @@ class ReaderScrollAnimation extends _$ReaderScrollAnimation {
     final value = ref.watch(sharedPreferencesProvider).get(_animationKey);
     return switch (value) {
       false => ReaderPageAnimation.none,
-      _rippleValue => ReaderPageAnimation.iReaderRipple,
+      String name => ReaderPageAnimation.values.firstWhere(
+          (mode) => mode.name == name,
+          orElse: () => ReaderPageAnimation.slide,
+        ),
       _ => ReaderPageAnimation.slide,
     };
   }
 
   void update(ReaderPageAnimation value) {
     final prefs = ref.read(sharedPreferencesProvider);
-    if (value == ReaderPageAnimation.iReaderRipple) {
-      prefs.setString(_animationKey, _rippleValue);
+    if (value.rippleSpeed != null) {
+      prefs.setString(_animationKey, value.name);
     } else {
       prefs.setBool(_animationKey, value == ReaderPageAnimation.slide);
     }
@@ -88,11 +103,22 @@ class ReaderScrollAnimationTile extends ConsumerWidget {
             value: ReaderPageAnimation.slide,
             child: Text(context.l10n.readerPageAnimationSlide),
           ),
-          if (_isAndroid || animation == ReaderPageAnimation.iReaderRipple)
-            DropdownMenuItem(
-              value: ReaderPageAnimation.iReaderRipple,
-              child: Text(context.l10n.readerPageAnimationIReader),
+          for (final (mode, label) in [
+            (
+              ReaderPageAnimation.iReaderRippleSlow,
+              context.l10n.readerPageAnimationIReaderSlow
             ),
+            (
+              ReaderPageAnimation.iReaderRipple,
+              context.l10n.readerPageAnimationIReader
+            ),
+            (
+              ReaderPageAnimation.iReaderRippleFast,
+              context.l10n.readerPageAnimationIReaderFast
+            ),
+          ])
+            if (_isAndroid || animation == mode)
+              DropdownMenuItem(value: mode, child: Text(label)),
         ],
       ),
     );

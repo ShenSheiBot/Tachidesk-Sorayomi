@@ -107,11 +107,12 @@ class SinglePageReaderMode extends HookConsumerWidget {
     Future<void> jumpTo(int targetPage) async {
       final currentPage = scrollController.page?.round() ?? currentIndex.value;
       if (targetPage == currentPage) return;
-      if (animation == ReaderPageAnimation.iReaderRipple &&
-          navigation.axis == Axis.horizontal) {
+      final speed = animation.rippleSpeed;
+      if (speed != null && navigation.axis == Axis.horizontal) {
         await prepareIReaderRipple(
           forward: targetPage > currentPage,
           rightToLeft: navigation.pageViewReverse,
+          speed: speed,
         );
         if (!context.mounted || !scrollController.hasClients) return;
       }

@@ -50,8 +50,8 @@ class MainActivity : FlutterAndroidVolumeKeydownActivity() {
                 } catch (_: NoSuchMethodException) {
                     null
                 }
-                // SmartOS encodes standard speed as bit 6, combined with direction.
-                command.invoke(null, "next-effect-type ${direction or 64}")
+                val speed = requireNotNull(call.argument<Int>("speed"))
+                command.invoke(null, "next-effect-type ${direction or speed}")
                 forceMode?.invoke(null, 0x01000063)
             }.fold(
                 onSuccess = { result.success(null) },

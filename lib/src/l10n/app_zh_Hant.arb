@@ -811,7 +811,9 @@
   },
   "readerPageAnimationNone": "無",
   "readerPageAnimationSlide": "滑動",
-  "readerPageAnimationIReader": "掌閱水波紋",
+  "readerPageAnimationIReaderSlow": "掌閱水波紋 · 慢速",
+  "readerPageAnimationIReader": "掌閱水波紋 · 標準",
+  "readerPageAnimationIReaderFast": "掌閱水波紋 · 快速",
   "readerScrollAnimation": "滑動動畫",
   "@readerScrollAnimation": {
     "description": "Switch title to Disable scroll animation in reader screen"
